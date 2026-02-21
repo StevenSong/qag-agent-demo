@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import requests
 from cachetools import TTLCache
@@ -62,7 +62,9 @@ def gdc_query_all(
 
 # fmt: off
 Project = Annotated[str, Field(description="GDC project name, for example 'TCGA-BRCA'")]
-GeneAaChange = Annotated[str, Field(description="Mutation to query, specified as the gene name and amino acid change (in HGVS protein notation), for example 'BRAF V600E'")]
+Gene = Annotated[str, Field(description="Gene to query, for example 'BRAF'")]
+AaChange = Annotated[str, Field(description="Amino acid change to query (in HGVS protein notation), for example 'V600E'")]
+CnvChange = Annotated[Literal["loss", "gain", "amplification", "homozygous deletion"], Field(description="Copy number variation change to query, for example 'homozygous deletion'")]
 SsmIds = Annotated[list[str], Field(description="List of SSM IDs (UUIDs) matching the search parameters")]
 CaseIds = Annotated[str, Field(description="UUID representing a set of case IDs matching a specified query. The retrieved cases are cached server side and are referenced by this unique identifier (UUID)")]
 # fmt: on
@@ -81,11 +83,13 @@ class CooccurrenceByProjectResult(BaseModel):
 
 
 @mcp.tool()
-def get_simple_somatic_mutation_ids(gene_aa_change: GeneAaChange) -> SsmIds:
+def get_simple_somatic_mutation_ids(gene: Gene, aa_change: AaChange) -> SsmIds:
     """
     A tool to query the GDC API for SSMs matching a specified amino acid change within a gene, for example 'BRAF V600E'. Note that a single amino acid change may be the result of multiple somatic mutations, so this tool will return all matched SSMs for the given amino acid change.
     """
-    print(f"get_simple_somatic_mutation_ids({repr(gene_aa_change)})")
+    print(
+        f"get_simple_somatic_mutation_ids(gene={repr(gene)}, aa_change={repr(aa_change)})"
+    )
     hits = gdc_query_all(
         endpoint="ssms",
         filters={
@@ -93,7 +97,7 @@ def get_simple_somatic_mutation_ids(gene_aa_change: GeneAaChange) -> SsmIds:
             "content": {
                 "field": "gene_aa_change",
                 "value": [
-                    gene_aa_change,
+                    f"{gene} {aa_change}",  # e.g. 'BRAF V600E'
                 ],
             },
         },
@@ -116,6 +120,43 @@ def get_simple_somatic_mutation_occurrences(ssm_ids: SsmIds) -> CaseIds:
                 "field": "ssm.ssm_id",
                 "value": ssm_ids,
             },
+        },
+        fields=["ssm.ssm_id", "case.submitter_id", "case.case_id"],
+    )
+
+    cache_id = str(uuid.uuid4())
+    case_cache[cache_id] = [hit["case"]["case_id"] for hit in hits]
+    return cache_id
+
+
+@mcp.tool()
+def get_copy_number_variant_occurrences(gene: Gene, cnv_change: CnvChange) -> CaseIds:
+    """
+    A tool to query the GDC API for cases with a copy number change within a specific gene. The resulting case IDs are cached server side and can be referenced using a unique identifier returned by this tool.
+    """
+    print(
+        f"get_simple_somatic_mutation_occurrences(gene={repr(gene)}, cnv_change={repr(cnv_change)})"
+    )
+    hits = gdc_query_all(
+        endpoint="cnv_occurrences",
+        filters={
+            "op": "and",
+            "content": [
+                {
+                    "op": "in",
+                    "content": {
+                        "field": "cnv.cnv_change_5_category",
+                        "value": [cnv_change],
+                    },
+                },
+                {
+                    "op": "in",
+                    "content": {
+                        "field": "cnv.consequence.gene.symbol",
+                        "value": [gene],
+                    },
+                },
+            ],
         },
         fields=["ssm.ssm_id", "case.submitter_id", "case.case_id"],
     )
