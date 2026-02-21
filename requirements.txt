@@ -1,0 +1,8 @@
+langchain
+langchain-mcp-adapters
+langchain-ollama
+jupyterlab
+ipywidgets
+cachetools
+pre-commit
+detect-secrets
