@@ -39,13 +39,13 @@ python server.py
 
 For this demo, we test 2 example queries from the QAG paper:
 * Simple Somatic Mutations:
-    ```
+    <code>
     what is the co-occurrence frequency of IDH1 R132H and TP53 R273C simple somatic mutations in the low grade glioma project TCGA-LGG in the genomic data commons?
-    ```
+    </code>
 * Copy Number Variants:
-    ```
+    <code>
     what is the co-occurrence frequency of somatic homozygous deletions in CDKN2A and CDKN2B in the mesothelioma project TCGA-MESO in the genomic data commons?
-    ```
+    </code>
 
 To execute these queries, run the agent:
 ```
