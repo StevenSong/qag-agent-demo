@@ -1,6 +1,6 @@
 # QAG Agent Demo
 
-This demo serves to modernize the Query Augmented Generation (QAG) framework using contemporary agentic concepts. The first iteration of QAG relied on a custom LLM to infer the intent of user queries. After categorizing the intent, a secondary model and retrieval system were used to gather the entities required to query the GDC API. Manual routing and orchestration using the intent and entities was done to construct and execute the GDC API queries. Finally, the resulting information was parsed by a tertiary LLM for final return to the user. These steps are fragile and do not scale well: the custom model to infer user intent was trained on poorly generated, templated synthetic queries for a small subset of tasks; additional tasks require manual curation of entity maps as well as custom router logic; and tasks are hard-coded and result in code duplication without sufficient modularization.
+This demo serves to modernize the Query Augmented Generation (QAG) framework using contemporary agentic concepts. The first iteration of QAG relied on a custom LLM to infer the intent of user queries. After categorizing the intent, a secondary model and static retrieval system were used to gather the entities required to query the GDC API. Manual routing and orchestration using the intent and entities was done to construct and execute the GDC API queries. Finally, the resulting information was parsed by a tertiary LLM for final return to the user. These steps are fragile and do not scale well: the custom model to infer user intent was trained on poorly generated, templated synthetic queries for a small subset of tasks; additional tasks require manual curation of entity maps as well as custom router logic; and tasks are hard-coded and result in code duplication without sufficient modularization.
 
 Modern agentic LLMs with well-documented MCP tools are sufficiently powerful to simplify all of these steps. Given MCP tool descriptions, an LLM agent can determine which tools are most appropriate for the given user query. Additionally, the agent can dynamically extract the entitities from the user's query and correctly prepare them in the input format required by the tools. When multiple steps of API queries are potentially necessary, the agent can dynamically plan and execute multi-round tool calls to accomplish a complex task. Yet, for simpler tasks, the modular tool design allows for direct reuse without custom logic or implementation.
 
@@ -20,9 +20,114 @@ For this demo, we test 2 example queries from the QAG paper:
     * <details>
       <summary>Expand for locally-served <code>gpt-oss-120b</code> agent answer</summary>
 
-      ```
-      TODO
-      ```
+        ```
+        ================================ System Message ================================
+
+        You are a helpful bioinformatics assistant. Use the provided tools to answer genomics questions. You may need to perform multiple tool calls to arrive at the final answer.
+
+        ================================ Human Message =================================
+
+        what is the co-occurrence frequency of IDH1 R132H and TP53 R273C simple somatic mutations in the low grade glioma project TCGA-LGG in the genomic data commons?
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_simple_somatic_mutation_ids (f579677d-93ff-46c2-9b3a-5a54ee9be51e)
+        Call ID: f579677d-93ff-46c2-9b3a-5a54ee9be51e
+        Args:
+            aa_change: R132H
+            gene: IDH1
+
+        ================================= Tool Message =================================
+        Name: get_simple_somatic_mutation_ids
+
+        [{'type': 'text', 'text': 'fa9713e8-ce92-5413-aacc-ed3d95ab7906', 'id': 'lc_43a4c216-d3bf-4ce5-b999-ef31d3597ed5'}]
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_simple_somatic_mutation_ids (30ed74b6-1b38-465e-98e6-7f6b425c7b7c)
+        Call ID: 30ed74b6-1b38-465e-98e6-7f6b425c7b7c
+        Args:
+            aa_change: R273C
+            gene: TP53
+
+        ================================= Tool Message =================================
+        Name: get_simple_somatic_mutation_ids
+
+        [{'type': 'text', 'text': '477e2125-974b-5af0-a876-25596d99ddbf', 'id': 'lc_08b3b5ec-d748-43f4-b522-1caa65ac79c8'}]
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_simple_somatic_mutation_occurrences (1398b1e2-eb48-48c3-9faf-287ccfda4179)
+        Call ID: 1398b1e2-eb48-48c3-9faf-287ccfda4179
+        Args:
+            ssm_ids: ['fa9713e8-ce92-5413-aacc-ed3d95ab7906']
+
+        ================================= Tool Message =================================
+        Name: get_simple_somatic_mutation_occurrences
+
+        [{'type': 'text', 'text': 'fef22b72-3a6c-40f9-bf3e-d1b2a05d93c9', 'id': 'lc_40158b64-1012-46e2-a39f-51a952bc3099'}]
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_simple_somatic_mutation_occurrences (18d562fd-1f89-4ae5-950f-89b4b6a508c5)
+        Call ID: 18d562fd-1f89-4ae5-950f-89b4b6a508c5
+        Args:
+            ssm_ids: ['...']
+
+        ================================= Tool Message =================================
+        Name: get_simple_somatic_mutation_occurrences
+
+        [{'type': 'text', 'text': '21702c8a-b30a-44c3-8ec3-d5fbedb894bc', 'id': 'lc_73d111cc-6a9f-43e2-ba10-f06593e723bb'}]
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_simple_somatic_mutation_occurrences (d55b8425-ae6b-4019-a193-8865bd00eb1e)
+        Call ID: d55b8425-ae6b-4019-a193-8865bd00eb1e
+        Args:
+            ssm_ids: ['477e2125-974b-5af0-a876-25596d99ddbf']
+
+        ================================= Tool Message =================================
+        Name: get_simple_somatic_mutation_occurrences
+
+        [{'type': 'text', 'text': '13bb350d-e471-4c28-ac39-4aeeee9b78c0', 'id': 'lc_efc04eea-d270-4548-9c74-fab16cb6a57f'}]
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_cases_by_project (4610f44a-09b4-4efc-8ac7-f2457e24bab8)
+        Call ID: 4610f44a-09b4-4efc-8ac7-f2457e24bab8
+        Args:
+            project: TCGA-LGG
+
+        ================================= Tool Message =================================
+        Name: get_cases_by_project
+
+        [{'type': 'text', 'text': '8e5896ea-ab74-4fbc-b6cb-9e191b4484b8', 'id': 'lc_d467c13e-0f89-44df-982b-b3dcd42472a9'}]
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_case_cooccurrence_frequency_by_project (ef82a7f2-7f8b-4ad1-9a78-0415791f173f)
+        Call ID: ef82a7f2-7f8b-4ad1-9a78-0415791f173f
+        Args:
+            cases_A: fef22b72-3a6c-40f9-bf3e-d1b2a05d93c9
+            cases_B: 13bb350d-e471-4c28-ac39-4aeeee9b78c0
+            cases_project: 8e5896ea-ab74-4fbc-b6cb-9e191b4484b8
+
+        ================================= Tool Message =================================
+        Name: get_case_cooccurrence_frequency_by_project
+
+        [{'type': 'text', 'text': '{\n  "cooccurrence_count": 36,\n  "total_project_cases": 516,\n  "cooccurrence_frequency": 0.06976744186046512\n}', 'id': 'lc_95d9b502-7c75-4776-b9ef-e9823217fe6a'}]
+
+        ================================== Ai Message ==================================
+
+        The co‑occurrence frequency of the **IDH1 R132H** and **TP53 R273C** simple somatic mutations within the **TCGA‑LGG (Low‑Grade Glioma)** project is:
+
+        **≈ 0.07 (7 %)**
+
+        - **Co‑occurring cases:** 36
+        - **Total TCGA‑LGG cases examined:** 516
+
+        Thus, about 7 % of low‑grade glioma cases in TCGA harbor both the IDH1 R132H and TP53 R273C mutations.
+        ```
 
       </details>
 * Copy Number Variants:
@@ -38,9 +143,75 @@ For this demo, we test 2 example queries from the QAG paper:
     * <details>
       <summary>Expand for locally-served <code>gpt-oss-120b</code> agent answer</summary>
 
-      ```
-      TODO
-      ```
+        ```
+        ================================ System Message ================================
+
+        You are a helpful bioinformatics assistant. Use the provided tools to answer genomics questions. You may need to perform multiple tool calls to arrive at the final answer.
+
+        ================================ Human Message =================================
+
+        what is the co-occurrence frequency of somatic homozygous deletions in CDKN2A and CDKN2B in the mesothelioma project TCGA-MESO in the genomic data commons?
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_copy_number_variant_occurrences (3f3be928-4927-4761-9757-d50422b784a3)
+        Call ID: 3f3be928-4927-4761-9757-d50422b784a3
+        Args:
+            cnv_change: homozygous deletion
+            gene: CDKN2A
+
+        ================================= Tool Message =================================
+        Name: get_copy_number_variant_occurrences
+
+        [{'type': 'text', 'text': 'b61749de-cbd9-41af-9bbf-747f50188c61', 'id': 'lc_b3dc193b-6bcb-4bc2-b316-5f21ad5d1c98'}]
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_copy_number_variant_occurrences (16ec47a7-8884-453e-9b1b-32ca25596df6)
+        Call ID: 16ec47a7-8884-453e-9b1b-32ca25596df6
+        Args:
+            cnv_change: homozygous deletion
+            gene: CDKN2B
+
+        ================================= Tool Message =================================
+        Name: get_copy_number_variant_occurrences
+
+        [{'type': 'text', 'text': 'a5360f7f-55d9-4a90-b5c4-9fa7391d0ba0', 'id': 'lc_dc076ada-0068-4e49-8745-edf56dc0c7fd'}]
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_cases_by_project (7ad58c8a-5e4c-43bd-b132-f7bb3cc28aef)
+        Call ID: 7ad58c8a-5e4c-43bd-b132-f7bb3cc28aef
+        Args:
+            project: TCGA-MESO
+
+        ================================= Tool Message =================================
+        Name: get_cases_by_project
+
+        [{'type': 'text', 'text': '1c679110-3811-4a67-83f9-a02707561d81', 'id': 'lc_49c1cab6-764a-4515-a3f5-8b23e394fe09'}]
+
+        ================================== Ai Message ==================================
+        Tool Calls:
+        get_case_cooccurrence_frequency_by_project (f0a05890-bfd6-4cac-a8e5-ba048cf95d54)
+        Call ID: f0a05890-bfd6-4cac-a8e5-ba048cf95d54
+        Args:
+            cases_A: b61749de-cbd9-41af-9bbf-747f50188c61
+            cases_B: a5360f7f-55d9-4a90-b5c4-9fa7391d0ba0
+            cases_project: 1c679110-3811-4a67-83f9-a02707561d81
+
+        ================================= Tool Message =================================
+        Name: get_case_cooccurrence_frequency_by_project
+
+        [{'type': 'text', 'text': '{\n  "cooccurrence_count": 39,\n  "total_project_cases": 87,\n  "cooccurrence_frequency": 0.4482758620689655\n}', 'id': 'lc_e260e742-da33-42bd-9b30-786133d69bdc'}]
+
+        ================================== Ai Message ==================================
+
+        The co‑occurrence frequency of **homozygous deletions** in **CDKN2A** and **CDKN2B** within the **TCGA‑MESO (mesothelioma)** project is:
+
+        **≈ 0.45 (44.8 %)**
+
+        This means that about 39 of the 87 mesothelioma cases in TCGA have homozygous deletions affecting both CDKN2A and CDKN2B.
+        ```
 
       </details>
 
