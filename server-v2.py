@@ -293,7 +293,7 @@ def get_microsatellite_instability_occurrences(
     case_ids = set()
     for hit in hits:
         for case in hit.get("cases", []):
-            case_ids.add(case["submitter_id"])
+            case_ids.add(case["case_id"])
     case_cache[cache_id] = list(case_ids)
 
     return cache_id
