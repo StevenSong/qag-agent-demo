@@ -285,8 +285,8 @@ def get_microsatellite_instability_occurrences(
         fields=[
             "msi_status",
             "msi_score",
-            "case.submitter_id",
-            "case.case_id",
+            "cases.submitter_id",
+            "cases.case_id",
         ],
     )
 
