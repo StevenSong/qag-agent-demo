@@ -295,7 +295,7 @@ python agent.py "<query>"
 
 ## Demo V2
 
-In `server-v2.py`, we extend the original demo to support all queries of the GDC-QAG paper (more below). In v2, we address some of the notes and limitations mentioned above. We first improve tool architecture by focusing tool purposes and clarify tool parameter descriptions and server instructions. We additionally remove UUIDs in favor of more natural-language-style identifiers, e.g. "Cases-SSM-BRAF" for cases with SSM mutation in BRAF. In place of running the original `server.py`, use `server-v2.py` as a drop-in for enhanced capabilities.
+In `server-v2.py`, we extend the original demo to support all queries of the GDC-QAG paper (more below). In v2, we address some of the notes and limitations mentioned above. We first improve tool architecture by focusing tool purposes and clarify tool parameter descriptions and server instructions. We additionally remove UUIDs in favor of more natural-language-style identifiers, e.g. "Cases-SSM-BRAF" for cases with SSM mutation in BRAF. In place of running the original `server.py`, use `server-v2.py` as a drop-in for enhanced capabilities. The main testing of this has been so-far with Claude Desktop (again, a powerful frontier-model as the brains behind the orchestration is very useful).
 
 ### Generalizing to all the queries of the GDC-QAG paper
 In the GDC-QAG paper, there are 6011 templated queries that are used for evaluation. These queries can be categorized and solved as follows:
