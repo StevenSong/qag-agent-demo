@@ -11,10 +11,34 @@ For this demo, we test 2 example queries from the QAG paper:
     ```
     what is the co-occurrence frequency of IDH1 R132H and TP53 R273C simple somatic mutations in the low grade glioma project TCGA-LGG in the genomic data commons?
     ```
+    * <details>
+      <summary>Expand for Claude Desktop answer</summary>
+      ![Claude Desktop response to SSM query](figs/claude_desktop_ssm.png)
+      </details>
+    * <details>
+      <summary>Expand for locally-served <code>gpt-oss-120b</code> agent answer</summary>
+
+      ```
+      TODO
+      ```
+
+      </details>
 * Copy Number Variants:
     ```
     what is the co-occurrence frequency of somatic homozygous deletions in CDKN2A and CDKN2B in the mesothelioma project TCGA-MESO in the genomic data commons?
     ```
+    * <details>
+      <summary>Expand for Claude Desktop answer</summary>
+      ![Claude Desktop response to CNV query](figs/claude_desktop_cnv.png)
+      </details>
+    * <details>
+      <summary>Expand for locally-served <code>gpt-oss-120b</code> agent answer</summary>
+
+      ```
+      TODO
+      ```
+
+      </details>
 
 ## Connect to the MCP server using Claude Desktop
 
