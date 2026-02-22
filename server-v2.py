@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal
 import requests
 from cachetools import TTLCache
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import Field
 
 mcp = FastMCP(
@@ -354,6 +355,12 @@ def compute_case_intersection(
         case_cache[cache_id] = case_cache[cache_id]
         return cache_id
 
+    for case_set_id in [case_set_id_A, case_set_id_B]:
+        if case_set_id not in case_cache:
+            raise ToolError(
+                f"Case set {case_set_id} was not found in the server side cache, perhaps it expired? Try requerying for those cases to cache it again."
+            )
+
     cases_A = set(case_cache[case_set_id_A])
     cases_B = set(case_cache[case_set_id_B])
 
@@ -375,6 +382,11 @@ def get_case_set_size(
         f"get_case_set_size(case_set_id={repr(case_set_id)})",
         file=sys.stderr,
     )
+
+    if case_set_id not in case_cache:
+        raise ToolError(
+            f"Case set {case_set_id} was not found in the server side cache, perhaps it expired? Try requerying for those cases to cache it again."
+        )
 
     return len(case_cache[case_set_id])
 
