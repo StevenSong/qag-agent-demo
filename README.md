@@ -4,6 +4,18 @@ This demo serves to modernize the Query Augmented Generation (QAG) framework usi
 
 Modern agentic LLMs with well-documented MCP tools are sufficiently powerful to simplify all of these steps. Given MCP tool descriptions, an LLM agent can determine which tools are most appropriate for the given user query. Additionally, the agent can dynamically extract the entitities from the user's query and correctly prepare them in the input format required by the tools. When multiple steps of API queries are potentially necessary, the agent can dynamically plan and execute multi-round tool calls to accomplish a complex task. Yet, for simpler tasks, the modular tool design allows for direct reuse without custom logic or implementation.
 
+## Example queries
+
+For this demo, we test 2 example queries from the QAG paper:
+* Simple Somatic Mutations:
+    ```
+    what is the co-occurrence frequency of IDH1 R132H and TP53 R273C simple somatic mutations in the low grade glioma project TCGA-LGG in the genomic data commons?
+    ```
+* Copy Number Variants:
+    ```
+    what is the co-occurrence frequency of somatic homozygous deletions in CDKN2A and CDKN2B in the mesothelioma project TCGA-MESO in the genomic data commons?
+    ```
+
 ## Connect to the MCP server using Claude Desktop
 
 At its core, this demo relies on a strong LLM and an MCP server. If you don't have access to a high-capacity GPU, you can still test out the demo by connecting the MCP server to a frontier-model provider (honestly, these resutls tend to be stronger). This section specifically details how to test out the MCP tools using Claude Desktop.
@@ -34,6 +46,9 @@ At its core, this demo relies on a strong LLM and an MCP server. If you don't ha
         }
     }
     ```
+1. Restart Claude Desktop (must fully close the application to reload the config)
+1. Verify that the `gdc` MCP server has started by checking the enabled "Connectors" (from the main prompt UI, click the `+` sign in the lower left, Connectors submenu)
+1. Try the example queries (you'll need to approve the tool usage through the UI)
 
 ## Using a locally served agent
 
@@ -67,16 +82,6 @@ python server.py
 ```
 
 #### Execute Queries
-
-For this demo, we test 2 example queries from the QAG paper:
-* Simple Somatic Mutations:
-    ```
-    what is the co-occurrence frequency of IDH1 R132H and TP53 R273C simple somatic mutations in the low grade glioma project TCGA-LGG in the genomic data commons?
-    ```
-* Copy Number Variants:
-    ```
-    what is the co-occurrence frequency of somatic homozygous deletions in CDKN2A and CDKN2B in the mesothelioma project TCGA-MESO in the genomic data commons?
-    ```
 
 To execute these queries, run the agent:
 ```
