@@ -293,9 +293,11 @@ python agent.py "<query>"
 * Another observation for instability may be the model's ability to parse and pass around UUIDs. This is precisely why the demo server uses a server side cache for very long lists of case IDs that can be referenced by a single UUID, but even then, sometimes the model gets weird outputs when trying to parse/repeat UUIDs.
 * This demo currently does not use structured outputs, but that should be trivial to add.
 
+## Demo V2
 
-## Generalizing to all the queries of the GDC-QAG paper
+In `server-v2.py`, we extend the original demo to support all queries of the GDC-QAG paper (more below). In v2, we address some of the notes and limitations mentioned above. We first improve tool architecture by focusing tool purposes and clarify tool parameter descriptions and server instructions. We additionally remove UUIDs in favor of more natural-language-style identifiers, e.g. "Cases-SSM-BRAF" for cases with SSM mutation in BRAF. In place of running the original `server.py`, use `server-v2.py` as a drop-in for enhanced capabilities.
 
+### Generalizing to all the queries of the GDC-QAG paper
 In the GDC-QAG paper, there are 6011 templated queries that are used for evaluation. These queries can be categorized and solved as follows:
 * SSM and CNV by Project:
     * Example:
