@@ -360,6 +360,8 @@ def compute_case_intersection(
             raise ToolError(
                 f"Case set {case_set_id} was not found in the server side cache, perhaps it expired? Try requerying for those cases to cache it again."
             )
+        # refresh the subsets since we're using them
+        case_cache[case_set_id] = case_cache[case_set_id]
 
     cases_A = set(case_cache[case_set_id_A])
     cases_B = set(case_cache[case_set_id_B])
@@ -387,6 +389,9 @@ def get_case_set_size(
         raise ToolError(
             f"Case set {case_set_id} was not found in the server side cache, perhaps it expired? Try requerying for those cases to cache it again."
         )
+
+    # refresh the subsets since we're using them
+    case_cache[case_set_id] = case_cache[case_set_id]
 
     return len(case_cache[case_set_id])
 
