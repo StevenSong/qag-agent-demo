@@ -13,7 +13,9 @@ For this demo, we test 2 example queries from the QAG paper:
     ```
     * <details>
       <summary>Expand for Claude Desktop answer</summary>
+
       ![Claude Desktop response to SSM query](figs/claude_desktop_ssm.png)
+
       </details>
     * <details>
       <summary>Expand for locally-served <code>gpt-oss-120b</code> agent answer</summary>
@@ -29,7 +31,9 @@ For this demo, we test 2 example queries from the QAG paper:
     ```
     * <details>
       <summary>Expand for Claude Desktop answer</summary>
+
       ![Claude Desktop response to CNV query](figs/claude_desktop_cnv.png)
+
       </details>
     * <details>
       <summary>Expand for locally-served <code>gpt-oss-120b</code> agent answer</summary>
