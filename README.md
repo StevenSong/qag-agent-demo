@@ -292,3 +292,96 @@ python agent.py "<query>"
 * The crux of an MCP server is the quality of the tool descriptions, including the purpose of the tool and the semantics and format of the arguments. The current tool descriptions were created very quickly in a single morning. There's alot of room for improvement.
 * Another observation for instability may be the model's ability to parse and pass around UUIDs. This is precisely why the demo server uses a server side cache for very long lists of case IDs that can be referenced by a single UUID, but even then, sometimes the model gets weird outputs when trying to parse/repeat UUIDs.
 * This demo currently does not use structured outputs, but that should be trivial to add.
+
+
+## Generalizing to all the queries of the GDC-QAG paper
+
+In the GDC-QAG paper, there are 6011 templated queries that are used for evaluation. These queries can be categorized and solved as follows:
+* SSM and CNV by Project:
+    * Example:
+        > What percentage of cancers have simple somatic mutations and copy number variants in BRAF in the genomic data commons for NCI Cancer Model Development for the Human Cancer Model Initiative HCMI-CMDC project?
+    * Templates (as regexes):
+        ```python
+        r"What percentage of cancers have simple somatic mutations and copy number variants in (.+?) in the genomic data commons for (.+?) project\?"
+        r"What is the incidence of simple somatic mutations and copy number variants in (.+?) in the genomic data commons for (.+?) project \?"
+        r"How common are simple somatic mutations and copy number variants in (.+?) in (.+?) project in the genomic data commons\?"
+        r"What fraction of cases have simple somatic mutations and copy number variants in (.+?) in (.+?) project in the genomic data commons\?"
+        r"What proportion of cancer patients exhibit simple somatic mutations and copy number variants in (.+?) in (.+?) project in the genomic data commons\?"
+        r"What is the frequency of simple somatic mutations and copy number variants in (.+?) in (.+?) project in the genomic data commons\?"
+        ```
+    * Solve strategy:
+        * Find cases C1 with SSM in gene
+        * Find cases C2 with CNV in gene
+        * Find cases P within project
+        * Compute C12 = C1 ∩ C2
+        * Compute Ret = C12 ∩ P
+* SSM by Project:
+    * Example:
+        > How often is the BRAF V600E found in Skin Cutaneous Melanoma TCGA-SKCM project in the genomic data commons?
+    * Templates (as regexes):
+        ```python
+        HGVS = r"[A-Z]\d+(?:[A-Z](?:fs\*\d+)?|\*)" # missense, nonsense, frameshift
+        rf"How often is the (.+?) ({HGVS}?) found in (.+?) project in the genomic data commons\?"
+        rf"What is the occurrence rate of (.+?) ({HGVS}?) in (.+?) project in the genomic data commons \?"
+        rf"What is the rate of occurrence of (.+?) ({HGVS}?) mutation in (.+?) project in the genomic data commons\?"
+        rf"How frequently are (.+?) ({HGVS}?) mutations detected in (.+?) project in the genomic data commons\?"
+        rf"What is the frequency of (.+?) ({HGVS}?) in (.+?) project in the genomic data commons\?"
+        ```
+    * Solve strategy:
+        * Find cases C with SSM in gene resulting in AA change
+        * Find cases P within project
+        * Compute Ret = C ∩ P
+* CNV by Project:
+    * Example:
+        > What is the frequency of somatic JAK2 heterozygous deletion in Acute Lymphoblastic Leukemia - Phase II TARGET-ALL-P2 project in the genomic data commons?
+    * Templates (as regexes):
+        ```python
+        r"What is the frequency of somatic (.+?) heterozygous deletion in (.+?) project in the genomic data commons\?"
+        r"What is the incidence of somatic (.+?) homozygous deletion in (.+?) project in the genomic data commons\?"
+        r"Can you provide the frequency of (.+?) gain in (.+?) project in the genomic data commons\?"
+        r"In (.+?) project data from the genomic data commons, what is the frequency of (.+?) amplification\?"
+        ```
+    * Solve strategy:
+        * Find cases C with CNV in gene with specific change type
+        * Find cases P within project
+        * Compute Ret = C ∩ P
+* MSI by Project:
+    * Example:
+        > How common is microsatellite instability in Genomic Characterization CS-MATCH-0007 Arm S1 MATCH-S1 project cases in the genomic data commons?
+    * Templates (as regexes):
+        ```python
+        r"How common is microsatellite instability in (.+?) project cases in the genomic data commons\?"
+        r"Can you provide the prevalence of microsatellite instability in (.+?) project in the genomic data commons\?"
+        r"What percentage of (.+?) project patients have microsatellite instability in the genomic data commons\?"
+        r"How often is microsatellite instability observed in (.+?) project in the genomic data commons\?"
+        r"In (.+?) project, what is the occurrence rate of microsatellite instability in the genomic data commons\?"
+        r"What is the incidence of microsatellite instability in (.+?) project in the genomic data commons\?"
+        r"What is the frequency of microsatellite instability in (.+?) project in the genomic data commons\?"
+        ```
+    * Solve strategy:
+        * Find cases C with MSI
+        * Find cases P within project
+        * Compute Ret = C ∩ P
+* Co-occurrence by Project:
+    * Example:
+        > What is the co-occurence frequency of somatic heterozygous deletions in CDKN2A and CDKN2B in the mesothelioma project TCGA-MESO in the genomic data commons?
+    * Templates (as regexes):
+        ```python
+        r"What is the co-occurence frequency of somatic heterozygous deletions in (.+?) and (.+?) in the (.+?) in the genomic data commons\?"
+        r"What is the co-occurence frequency of somatic homozygous deletions in (.+?) and (.+?) in the (.+?) in the genomic data commons\?"
+        ```
+    * Solve strategy:
+        * Find cases C1 with condition 1
+        * Find cases C2 with condition 2
+        * Find cases P within project
+        * Compute C12 = C1 ∩ C2
+        * Compute Ret = C12 ∩ P
+
+### Modularization and reusable components
+These questions can be solved with a minimal set of tools, specifically:
+1. tool to compute case intersection
+1. tools to retrieve cases:
+    1. by project
+    1. by SSM within a gene (optionally resulting in an AA change)
+    1. by CNV within a gene (optionally with a specific change type)
+    1. by MSI status

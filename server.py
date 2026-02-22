@@ -1,16 +1,20 @@
 import argparse
 import sys
-import uuid
 from typing import Annotated, Any, Literal
 
 import requests
 from cachetools import TTLCache
 from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 mcp = FastMCP(
     name="GDC API MCP Server",
-    instructions="Use the tools of this server to query data from the GDC.",
+    instructions=(
+        "Use the tools of this server to answer questions about genomic variant statistics from data in the GDC. "
+        "Currently, we support querying cases by simple somatic mutation, copy number variant, and microsatellite instability. "
+        "Queried case sets are cached server-side. Case set intersection is additionally provided server side. "
+        "Case counts can be returned for any retrieved or computed case sets."
+    ),
 )
 
 case_cache = TTLCache(maxsize=1000, ttl=3600)
@@ -62,62 +66,103 @@ def gdc_query_all(
     return all_hits
 
 
-# fmt: off
-Project = Annotated[str, Field(description="GDC project name, for example 'TCGA-BRCA'")]
-Gene = Annotated[str, Field(description="Gene to query, for example 'BRAF'")]
-AaChange = Annotated[str, Field(description="Amino acid change to query (in HGVS protein notation), for example 'V600E'")]
-CnvChange = Annotated[Literal["loss", "gain", "amplification", "homozygous deletion"], Field(description="Copy number variation change to query, for example 'homozygous deletion'")]
-SsmIds = Annotated[list[str], Field(description="List of SSM IDs (UUIDs) matching the search parameters")]
-CaseIds = Annotated[str, Field(description="UUID representing a set of case IDs matching a specified query. The retrieved cases are cached server side and are referenced by this unique identifier (UUID)")]
-# fmt: on
-
-
-class CooccurrenceByProjectResult(BaseModel):
-    cooccurrence_count: int = Field(
-        description="Number of overlapping between two sets of cases within a project."
-    )
-    total_project_cases: int = Field(
-        description="Total number of cases within a project."
-    )
-    cooccurrence_frequency: float = Field(
-        description="Fraction of all project cases where two sets of cases overlap."
-    )
+Project = Annotated[
+    str,
+    Field(
+        description="GDC project name, for example 'TCGA-BRCA'.",
+    ),
+]
+Gene = Annotated[
+    str,
+    Field(
+        description="Gene to query, for example 'BRAF'.",
+    ),
+]
+AAChange = Annotated[
+    str,
+    Field(
+        description="Amino acid change to query (in HGVS protein notation), for example 'V600E'.",
+    ),
+]
+CNVChange = Annotated[
+    Literal["gain", "amplification", "heterozygous deletion", "homozygous deletion"],
+    Field(
+        description="Copy number variation change to query, for example 'homozygous deletion'.",
+    ),
+]
+MSIStatus = Annotated[
+    Literal["msi", "mss"],
+    Field(
+        description="Microsatellite instability status, 'msi' = microsatellite instable, 'MSS' = microsatellite stable",
+    ),
+]
+CaseSetId = Annotated[
+    str,
+    Field(
+        description=(
+            "ID representing a set of cases matching a specified query. "
+            "The retrieved cases are cached server side and are referenced by this identifier. "
+            "The ID additionally encodes the method by which the case set was computed, for example 'SSM-in-BRAF'."
+        ),
+    ),
+]
+CaseCount = Annotated[
+    int,
+    Field(
+        description="Number of cases for a retrieved or computed case set.",
+    ),
+]
 
 
 @mcp.tool()
-def get_simple_somatic_mutation_ids(gene: Gene, aa_change: AaChange) -> SsmIds:
+def get_simple_somatic_mutation_occurrences(
+    gene: Gene,
+    aa_change: AAChange | None = None,
+) -> CaseSetId:
     """
-    A tool to query the GDC API for SSMs matching a specified amino acid change within a gene, for example 'BRAF V600E'. Note that a single amino acid change may be the result of multiple somatic mutations, so this tool will return all matched SSMs for the given amino acid change.
+    A tool to query the GDC API for cases with simple somatic mutations (SSMs).
+    This tool searches for SSMs within a given gene, and optionally with a specified amino acid change.
+    The resulting case set is cached server side and can be referenced using the unique identifier returned by this tool.
     """
     print(
-        f"get_simple_somatic_mutation_ids(gene={repr(gene)}, aa_change={repr(aa_change)})",
+        f"get_simple_somatic_mutation_occurrences(gene={repr(gene)}, aa_change={repr(aa_change)})",
         file=sys.stderr,
     )
-    hits = gdc_query_all(
-        endpoint="ssms",
-        filters={
+
+    cache_id = f"SSM-{gene}"
+    if aa_change is not None:
+        cache_id = f"{cache_id}-{aa_change}"
+
+    # if we've already done this retrieval, refresh it in the cache and shortcut return
+    if cache_id in case_cache:
+        case_cache[cache_id] = case_cache[cache_id]
+        return cache_id
+
+    # first get SSMs for the given query parameters, either by gene & AA change or just gene
+    if aa_change is not None:
+        _filters = {
             "op": "in",
             "content": {
                 "field": "gene_aa_change",
-                "value": [
-                    f"{gene} {aa_change}",  # e.g. 'BRAF V600E'
-                ],
+                "value": [f"{gene} {aa_change}"],  # e.g. 'BRAF V600E'
             },
-        },
+        }
+    else:
+        _filters = {
+            "op": "in",
+            "content": {
+                "field": "consequence.transcript.gene.symbol",
+                "value": [gene],
+            },
+        }
+    hits = gdc_query_all(
+        endpoint="ssms",
+        filters=_filters,
         fields=["gene_aa_change", "ssm_id"],
     )
-    return [hit["ssm_id"] for hit in hits]
+    ssm_ids = [hit["ssm_id"] for hit in hits]
 
-
-@mcp.tool()
-def get_simple_somatic_mutation_occurrences(ssm_ids: SsmIds) -> CaseIds:
-    """
-    A tool to query the GDC API for cases with the specified SSMs. If multiple SSMs are given, this tool computes the union of cases for those SSMs. This is useful in case multiple SSMs result in a specific amino acid change. This tool should not be used to compute intersections or cooccurrences! The resulting case IDs are cached server side and can be referenced using a unique identifier returned by this tool.
-    """
-    print(
-        f"get_simple_somatic_mutation_occurrences({repr(ssm_ids)})",
-        file=sys.stderr,
-    )
+    # then get cases matching those SSMs
     hits = gdc_query_all(
         endpoint="ssm_occurrences",
         filters={
@@ -129,41 +174,67 @@ def get_simple_somatic_mutation_occurrences(ssm_ids: SsmIds) -> CaseIds:
         },
         fields=["ssm.ssm_id", "case.submitter_id", "case.case_id"],
     )
+    case_ids = set([hit["case"]["case_id"] for hit in hits])
+    case_cache[cache_id] = list(case_ids)
 
-    cache_id = str(uuid.uuid4())
-    case_cache[cache_id] = [hit["case"]["case_id"] for hit in hits]
     return cache_id
 
 
 @mcp.tool()
-def get_copy_number_variant_occurrences(gene: Gene, cnv_change: CnvChange) -> CaseIds:
+def get_copy_number_variant_occurrences(
+    gene: Gene,
+    cnv_change: CNVChange | None = None,
+) -> CaseSetId:
     """
-    A tool to query the GDC API for cases with a copy number change within a specific gene. The resulting case IDs are cached server side and can be referenced using a unique identifier returned by this tool.
+    A tool to query the GDC API for cases with copy number variations (CNVs).
+    This tool searches for CNVs within a given gene, and optionally with a specific change type.
+    The resulting case set is cached server side and can be referenced using the unique identifier returned by this tool.
     """
     print(
         f"get_copy_number_variant_occurrences(gene={repr(gene)}, cnv_change={repr(cnv_change)})",
         file=sys.stderr,
     )
+
+    cache_id = f"CNV-{gene}"
+    if cnv_change is not None:
+        cache_id = f"{cache_id}-{cnv_change}"
+
+    # if we've already done this retrieval, refresh it in the cache and shortcut return
+    if cache_id in case_cache:
+        case_cache[cache_id] = case_cache[cache_id]
+        return cache_id
+
+    # apparently `heterozygous deletion` change type is `loss` so remap it
+    # keep the enum for the LLM to help it disambiguate the options
+    # see: https://github.com/uc-cdis/gdc-qag/blob/07af83ecae960bd6f62347c473268ff73e725325/check_6k_mutations_withTable2.py#L541-L559
+    if cnv_change == "heterozygous deletion":
+        cnv_change = "loss"  # type: ignore
+
+    ops = [
+        {
+            "op": "in",
+            "content": {
+                "field": "cnv.consequence.gene.symbol",
+                "value": [gene],
+            },
+        },
+    ]
+    if cnv_change is not None:
+        ops.append(
+            {
+                "op": "in",
+                "content": {
+                    "field": "cnv.cnv_change_5_category",
+                    "value": [cnv_change],
+                },
+            }
+        )
+
     hits = gdc_query_all(
         endpoint="cnv_occurrences",
         filters={
             "op": "and",
-            "content": [
-                {
-                    "op": "in",
-                    "content": {
-                        "field": "cnv.cnv_change_5_category",
-                        "value": [cnv_change],
-                    },
-                },
-                {
-                    "op": "in",
-                    "content": {
-                        "field": "cnv.consequence.gene.symbol",
-                        "value": [gene],
-                    },
-                },
-            ],
+            "content": ops,
         },
         fields=[
             "cnv.cnv_change",
@@ -173,21 +244,78 @@ def get_copy_number_variant_occurrences(gene: Gene, cnv_change: CnvChange) -> Ca
             "case.case_id",
         ],
     )
+    case_ids = set([hit["case"]["case_id"] for hit in hits])
+    case_cache[cache_id] = list(case_ids)
 
-    cache_id = str(uuid.uuid4())
-    case_cache[cache_id] = [hit["case"]["case_id"] for hit in hits]
     return cache_id
 
 
 @mcp.tool()
-def get_cases_by_project(project: Project) -> CaseIds:
+def get_microsatellite_instability_occurrences(
+    msi_status: MSIStatus = "msi",
+) -> CaseSetId:
     """
-    A tool to query the GDC API for cases within a specified project, for example 'TCGA-BRCA'. The resulting case IDs are cached server side and can be referenced using a unique identifier returned by this tool.
+    A tool to query the GDC API for cases with microsatellite instability (MSI).
+    This tool searches for either MSI or MSS status, by default MSI.
+    The resulting case set is cached server side and can be referenced using the unique identifier returned by this tool.
     """
     print(
-        f"get_cases_by_project({repr(project)})",
+        f"get_microsatellite_instability_occurrences(msi_status={repr(msi_status)})",
         file=sys.stderr,
     )
+
+    cache_id = f"MSI-{msi_status}"
+
+    # if we've already done this retrieval, refresh it in the cache and shortcut return
+    if cache_id in case_cache:
+        case_cache[cache_id] = case_cache[cache_id]
+        return cache_id
+
+    # MSI is stored at the file level, so we need to query the files and aggregate back up to the cases
+    hits = gdc_query_all(
+        endpoint="files",
+        filters={
+            "op": "and",
+            "content": [
+                {"op": "in", "content": {"field": "msi_status", "value": [msi_status]}},
+                {"op": "in", "content": {"field": "data_format", "value": ["BAM"]}},
+            ],
+        },
+        fields=[
+            "msi_status",
+            "msi_score",
+            "case.submitter_id",
+            "case.case_id",
+        ],
+    )
+
+    case_ids = set()
+    for hit in hits:
+        for case in hit.get("cases", []):
+            case_ids.add(case["submitter_id"])
+    case_cache[cache_id] = list(case_ids)
+
+    return cache_id
+
+
+@mcp.tool()
+def get_cases_by_project(project: Project) -> CaseSetId:
+    """
+    A tool to query the GDC API for cases of a project, for example 'TCGA-BRCA'.
+    The resulting case set is cached server side and can be referenced using the unique identifier returned by this tool.
+    """
+    print(
+        f"get_cases_by_project(project={repr(project)})",
+        file=sys.stderr,
+    )
+
+    cache_id = f"Project-{project}"
+
+    # if we've already done this retrieval, refresh it in the cache and shortcut return
+    if cache_id in case_cache:
+        case_cache[cache_id] = case_cache[cache_id]
+        return cache_id
+
     hits = gdc_query_all(
         endpoint="cases",
         filters={
@@ -199,45 +327,56 @@ def get_cases_by_project(project: Project) -> CaseIds:
         },
         fields=["project.project_id", "submitter_id"],
     )
+    case_ids = set([hit["id"] for hit in hits])
+    case_cache[cache_id] = list(case_ids)
 
-    cache_id = str(uuid.uuid4())
-    case_cache[cache_id] = [hit["id"] for hit in hits]
     return cache_id
 
 
 @mcp.tool()
-def get_case_cooccurrence_frequency_by_project(
-    cases_A: CaseIds,
-    cases_B: CaseIds,
-    cases_project: CaseIds,
-) -> CooccurrenceByProjectResult:
+def compute_case_intersection(
+    case_set_id_A: CaseSetId,
+    case_set_id_B: CaseSetId,
+) -> CaseSetId:
     """
-    A tool to compute the cooccurrence frequency between two conditions within a
-    project. The conditions and project should be specified as case sets. Specifically,
-    this tool computes |(cases_A & cases_B) & cases_project| / |cases_project|.
-    The specified case sets should be first precomputed using other tools and cached server side.
-    The arguments to this tool are then the unique identifiers to retrieve those case IDs.
+    A tool to compute the intersection between two case sets.
+    The resulting intersected case set is cached server side and can be referenced using the unique identifier returned by this tool.
     """
     print(
-        f"get_case_cooccurrence_frequency_by_project(\n"
-        f"    cases_A={repr(cases_A)},\n"
-        f"    cases_B={repr(cases_B)},\n"
-        f"    cases_project={repr(cases_project)},\n"
-        f")",
+        f"compute_case_intersection(case_set_id_A={repr(case_set_id_A)}, case_set_id_B={repr(case_set_id_B)})",
         file=sys.stderr,
     )
-    _cases_A = set(case_cache[cases_A])
-    _cases_B = set(case_cache[cases_B])
-    _cases_project = set(case_cache[cases_project])
 
-    A_and_B = _cases_A & _cases_B
-    project_A_and_B = A_and_B & _cases_project
+    cache_id = f"Intersect-({case_set_id_A})-AND-({case_set_id_B})"
 
-    return CooccurrenceByProjectResult(
-        cooccurrence_count=len(project_A_and_B),
-        total_project_cases=len(_cases_project),
-        cooccurrence_frequency=len(project_A_and_B) / len(_cases_project),
+    # if we've already done this retrieval, refresh it in the cache and shortcut return
+    if cache_id in case_cache:
+        case_cache[cache_id] = case_cache[cache_id]
+        return cache_id
+
+    cases_A = set(case_cache[case_set_id_A])
+    cases_B = set(case_cache[case_set_id_B])
+
+    A_and_B = cases_A & cases_B
+    case_cache[cache_id] = list(A_and_B)
+
+    return cache_id
+
+
+@mcp.tool()
+def get_case_set_size(
+    case_set_id: CaseSetId,
+) -> CaseCount:
+    """
+    A tool to retireve the size of a precomputed case set.
+    The case set must first be cached server side by one of the other tools provided by this MCP server.
+    """
+    print(
+        f"get_case_set_size(case_set_id={repr(case_set_id)})",
+        file=sys.stderr,
     )
+
+    return len(case_cache[case_set_id])
 
 
 if __name__ == "__main__":
