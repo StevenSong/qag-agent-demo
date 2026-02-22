@@ -1,3 +1,5 @@
+import argparse
+import sys
 import uuid
 from typing import Annotated, Any, Literal
 
@@ -41,7 +43,7 @@ def gdc_query_all(
         resp_json = response.json()
 
         if resp_json["warnings"]:
-            print(resp_json["warnings"])
+            print(resp_json["warnings"], file=sys.stderr)
 
         data = resp_json["data"]
 
@@ -51,7 +53,7 @@ def gdc_query_all(
         pagination = data["pagination"]
         total = pagination["total"]
 
-        # print(f"Retrieved {len(all_hits)} / {total}")
+        # print(f"Retrieved {len(all_hits)} / {total}", file=sys.stderr)
 
         offset += page_size
         if offset >= total:
@@ -88,7 +90,8 @@ def get_simple_somatic_mutation_ids(gene: Gene, aa_change: AaChange) -> SsmIds:
     A tool to query the GDC API for SSMs matching a specified amino acid change within a gene, for example 'BRAF V600E'. Note that a single amino acid change may be the result of multiple somatic mutations, so this tool will return all matched SSMs for the given amino acid change.
     """
     print(
-        f"get_simple_somatic_mutation_ids(gene={repr(gene)}, aa_change={repr(aa_change)})"
+        f"get_simple_somatic_mutation_ids(gene={repr(gene)}, aa_change={repr(aa_change)})",
+        file=sys.stderr,
     )
     hits = gdc_query_all(
         endpoint="ssms",
@@ -111,7 +114,10 @@ def get_simple_somatic_mutation_occurrences(ssm_ids: SsmIds) -> CaseIds:
     """
     A tool to query the GDC API for cases with the specified SSMs. If multiple SSMs are given, this tool computes the union of cases for those SSMs. This is useful in case multiple SSMs result in a specific amino acid change. This tool should not be used to compute intersections or cooccurrences! The resulting case IDs are cached server side and can be referenced using a unique identifier returned by this tool.
     """
-    print(f"get_simple_somatic_mutation_occurrences({repr(ssm_ids)})")
+    print(
+        f"get_simple_somatic_mutation_occurrences({repr(ssm_ids)})",
+        file=sys.stderr,
+    )
     hits = gdc_query_all(
         endpoint="ssm_occurrences",
         filters={
@@ -135,7 +141,8 @@ def get_copy_number_variant_occurrences(gene: Gene, cnv_change: CnvChange) -> Ca
     A tool to query the GDC API for cases with a copy number change within a specific gene. The resulting case IDs are cached server side and can be referenced using a unique identifier returned by this tool.
     """
     print(
-        f"get_simple_somatic_mutation_occurrences(gene={repr(gene)}, cnv_change={repr(cnv_change)})"
+        f"get_copy_number_variant_occurrences(gene={repr(gene)}, cnv_change={repr(cnv_change)})",
+        file=sys.stderr,
     )
     hits = gdc_query_all(
         endpoint="cnv_occurrences",
@@ -158,7 +165,13 @@ def get_copy_number_variant_occurrences(gene: Gene, cnv_change: CnvChange) -> Ca
                 },
             ],
         },
-        fields=["ssm.ssm_id", "case.submitter_id", "case.case_id"],
+        fields=[
+            "cnv.cnv_change",
+            "cnv.cnv_change_5_category",
+            "cnv.consequence.gene.symbol",
+            "case.submitter_id",
+            "case.case_id",
+        ],
     )
 
     cache_id = str(uuid.uuid4())
@@ -171,7 +184,10 @@ def get_cases_by_project(project: Project) -> CaseIds:
     """
     A tool to query the GDC API for cases within a specified project, for example 'TCGA-BRCA'. The resulting case IDs are cached server side and can be referenced using a unique identifier returned by this tool.
     """
-    print(f"get_cases_by_project({repr(project)})")
+    print(
+        f"get_cases_by_project({repr(project)})",
+        file=sys.stderr,
+    )
     hits = gdc_query_all(
         endpoint="cases",
         filters={
@@ -207,7 +223,8 @@ def get_case_cooccurrence_frequency_by_project(
         f"    cases_A={repr(cases_A)},\n"
         f"    cases_B={repr(cases_B)},\n"
         f"    cases_project={repr(cases_project)},\n"
-        f")"
+        f")",
+        file=sys.stderr,
     )
     _cases_A = set(case_cache[cases_A])
     _cases_B = set(case_cache[cases_B])
@@ -224,4 +241,7 @@ def get_case_cooccurrence_frequency_by_project(
 
 
 if __name__ == "__main__":
-    mcp.run(transport="sse")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--transport", default="sse", choices=["sse", "stdio"])
+    args = parser.parse_args()
+    mcp.run(transport=args.transport)

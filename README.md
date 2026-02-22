@@ -4,9 +4,40 @@ This demo serves to modernize the Query Augmented Generation (QAG) framework usi
 
 Modern agentic LLMs with well-documented MCP tools are sufficiently powerful to simplify all of these steps. Given MCP tool descriptions, an LLM agent can determine which tools are most appropriate for the given user query. Additionally, the agent can dynamically extract the entitities from the user's query and correctly prepare them in the input format required by the tools. When multiple steps of API queries are potentially necessary, the agent can dynamically plan and execute multi-round tool calls to accomplish a complex task. Yet, for simpler tasks, the modular tool design allows for direct reuse without custom logic or implementation.
 
-## Tech Stack
+## Connect to the MCP server using Claude Desktop
 
-For this demo, we use the following tools:
+At its core, this demo relies on a strong LLM and an MCP server. If you don't have access to a high-capacity GPU, you can still test out the demo by connecting the MCP server to a frontier-model provider (honestly, these resutls tend to be stronger). This section specifically details how to test out the MCP tools using Claude Desktop.
+1. Download and install Claude Desktop (https://claude.com/download)
+1. Download and install `uv` (https://docs.astral.sh/uv/#installation)
+1. Clone this repository and setup your virtual environment:
+    ```
+    git clone git@github.com:StevenSong/qag-agent-demo.git
+    cd qag-agent-demo
+    uv venv --python 3.12.12
+    uv pip install -r requirements.txt
+    source .venv/bin/activate
+    ```
+1. Open Claude Desktop, go to Settings > Developer > Edit Config, and open the file `claude_desktop_config.json` in your favorite text editor
+1. Add the following section to your JSON config file, note that you should provide absolute paths for `uv` and `qag-agent-demo`:
+    ```
+    "mcpServers": {
+        "gdc": {
+            "command": "/path/to/uv"
+            "args": [
+                "--directory",
+                "/path/to/qag-agent-demo",
+                "run",
+                "server.py",
+                "-t",
+                "stdio"
+            ]
+        }
+    }
+    ```
+
+## Using a locally served agent
+
+If you have access to a high-capacity GPU (e.g. 80GB of VRAM), you can use a capable open-weight reasoning model to create an agent which queries the GDC through the MCP server. To that end, we use the following tools:
 * `openai/gpt-oss-120b` as our reasoning/tool calling model
 * dockerized `ollama` to serve the LLM
 * `FastMCP` to define our MCP server
@@ -14,7 +45,7 @@ For this demo, we use the following tools:
     * `langchain-ollama` to connect to our `ollama` instance
     * `langchain-mcp-adapters` to connect to our MCP instance
 
-## Setup
+#### Setup
 
 Clone this repo and setup your environment. We use conda below but you can alternatively use any other virtual environment manager (eg `uv`) and install directly from `requirements.txt`. If you use something other than conda, make sure to use the same python version (`3.12.12`).
 
@@ -23,7 +54,7 @@ conda create -f env.yaml
 conda activate qag-agent-demo
 ```
 
-## Run Servers
+#### Run Servers
 
 Once you've setup and activated your environment, start the `ollama` and MCP servers:
 ```
@@ -35,7 +66,7 @@ docker exec ollama ollama run gpt-oss:120b
 python server.py
 ```
 
-## Execute Queries
+#### Execute Queries
 
 For this demo, we test 2 example queries from the QAG paper:
 * Simple Somatic Mutations:
@@ -55,3 +86,5 @@ python agent.py "<query>"
 ## Notes
 * Because the entire agent orchestration is dynamic and LLM-driven, it is possible for the LLM to make mistakes. While there are observed stabilities issues with this demo (e.g. with the SSM query), these are potentially solveable using standard LLM prompting techniques (see next bullet).
 * The crux of an MCP server is the quality of the tool descriptions, including the purpose of the tool and the semantics and format of the arguments. The current tool descriptions were created very quickly in a single morning. There's alot of room for improvement.
+* Another observation for instability may be the model's ability to parse and pass around UUIDs. This is precisely why the demo server uses a server side cache for very long lists of case IDs that can be referenced by a single UUID, but even then, sometimes the model gets weird outputs when trying to parse/repeat UUIDs.
+* This demo currently does not use structured outputs, but that should be trivial to add.
