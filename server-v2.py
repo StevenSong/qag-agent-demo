@@ -410,10 +410,10 @@ TOOL_TO_CACHE_ID_PATTERN = {
         r"Cases-CNV-(?P<gene>.+?)(?:-(?P<cnv_change>.+))?",
     ),
     "get_microsatellite_instability_occurrences": re.compile(
-        r"Cases-MSI-(?P<msi_status>.+?)",
+        r"Cases-MSI-(?P<msi_status>.+)",
     ),
     "get_cases_by_project": re.compile(
-        r"Cases-Project-(?P<project>.+?)",
+        r"Cases-Project-(?P<project>.+)",
     ),
 }
 
