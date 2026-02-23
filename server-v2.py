@@ -423,12 +423,12 @@ def suggest_tool_from_case_set_id(case_set_id: CaseSetId) -> str:
         if (m := pattern.match(case_set_id)) is not None:
             tool_args = ", ".join([f"{k}={v}" for k, v in m.groupdict().items()])
             return (
-                f"Based on the provided case_set_id=({case_set_id}), "
-                f"it looks like you need to use invoke the following tool with these args: "
+                f"Based on the provided case_set_id={case_set_id}, "
+                f"it looks like you need to use the following tool with these args: "
                 f"{tool_name}({tool_args})"
             )
     return (
-        f"The provided case_set_id=({case_set_id}) did not match any known patterns returned by our tools. "
+        f"The provided case_set_id={case_set_id} did not match any known patterns returned by our tools. "
         f"Are you sure the tools in this MCP server were used to query for cases?"
     )
 
