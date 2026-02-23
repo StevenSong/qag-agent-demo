@@ -1,4 +1,5 @@
 import argparse
+import re
 import sys
 from typing import Annotated, Any, Literal
 
@@ -358,7 +359,8 @@ def compute_case_intersection(
     for case_set_id in [case_set_id_A, case_set_id_B]:
         if case_set_id not in case_cache:
             raise ToolError(
-                f"Case set {case_set_id} was not found in the server side cache, perhaps it expired? Try requerying for those cases to cache it again."
+                f"Case set {case_set_id} was not found in the server side cache, perhaps it expired? "
+                f"Try requerying for those cases to cache it again. {suggest_tool_from_case_set_id(case_set_id)}"
             )
         # refresh the subsets since we're using them
         case_cache[case_set_id] = case_cache[case_set_id]
@@ -387,13 +389,48 @@ def get_case_set_size(
 
     if case_set_id not in case_cache:
         raise ToolError(
-            f"Case set {case_set_id} was not found in the server side cache, perhaps it expired? Try requerying for those cases to cache it again."
+            f"Case set {case_set_id} was not found in the server side cache, perhaps it expired? "
+            f"Try requerying for those cases to cache it again. {suggest_tool_from_case_set_id(case_set_id)}"
         )
 
     # refresh the subsets since we're using them
     case_cache[case_set_id] = case_cache[case_set_id]
 
     return len(case_cache[case_set_id])
+
+
+TOOL_TO_CACHE_ID_PATTERN = {
+    "compute_case_intersection": re.compile(
+        r"Cases-Intersect-\((?P<case_set_id_A>.+)\)-AND-\((?P<case_set_id_B>.+)\)",
+    ),
+    "get_simple_somatic_mutation_occurrences": re.compile(
+        r"Cases-SSM-(?P<gene>.+?)(?:-(?P<aa_change>.+))?",
+    ),
+    "get_copy_number_variant_occurrences": re.compile(
+        r"Cases-CNV-(?P<gene>.+?)(?:-(?P<cnv_change>.+))?",
+    ),
+    "get_microsatellite_instability_occurrences": re.compile(
+        r"Cases-MSI-(?P<msi_status>.+?)",
+    ),
+    "get_cases_by_project": re.compile(
+        r"Cases-Project-(?P<project>.+?)",
+    ),
+}
+
+
+def suggest_tool_from_case_set_id(case_set_id: CaseSetId) -> str:
+    for tool_name, pattern in TOOL_TO_CACHE_ID_PATTERN.items():
+        if (m := pattern.match(case_set_id)) is not None:
+            tool_args = ", ".join([f"{k}={v}" for k, v in m.groupdict().items()])
+            return (
+                f"Based on the provided case_set_id=({case_set_id}), "
+                f"it looks like you need to use invoke the following tool with these args: "
+                f"{tool_name}({tool_args})"
+            )
+    return (
+        f"The provided case_set_id=({case_set_id}) did not match any known patterns returned by our tools. "
+        f"Are you sure the tools in this MCP server were used to query for cases?"
+    )
 
 
 if __name__ == "__main__":
