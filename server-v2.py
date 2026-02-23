@@ -404,10 +404,10 @@ TOOL_TO_CACHE_ID_PATTERN = {
         r"Cases-Intersect-\((?P<case_set_id_A>.+)\)-AND-\((?P<case_set_id_B>.+)\)",
     ),
     "get_simple_somatic_mutation_occurrences": re.compile(
-        r"Cases-SSM-(?P<gene>.+?)(?:-(?P<aa_change>.+))?",
+        r"Cases-SSM-(?P<gene>[^-]+)(?:-(?P<aa_change>.+))?",
     ),
     "get_copy_number_variant_occurrences": re.compile(
-        r"Cases-CNV-(?P<gene>.+?)(?:-(?P<cnv_change>.+))?",
+        r"Cases-CNV-(?P<gene>[^-]+)(?:-(?P<cnv_change>.+))?",
     ),
     "get_microsatellite_instability_occurrences": re.compile(
         r"Cases-MSI-(?P<msi_status>.+)",
