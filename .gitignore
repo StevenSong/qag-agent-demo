@@ -215,3 +215,4 @@ temp/
 *.BAK
 
 node_modules
+.langgraph_api
