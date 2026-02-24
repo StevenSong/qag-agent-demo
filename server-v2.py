@@ -435,6 +435,8 @@ def suggest_tool_from_case_set_id(case_set_id: CaseSetId) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--transport", default="sse", choices=["sse", "stdio"])
+    parser.add_argument(
+        "-t", "--transport", required=True, choices=["sse", "stdio", "streamable-http"]
+    )
     args = parser.parse_args()
     mcp.run(transport=args.transport)

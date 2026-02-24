@@ -213,3 +213,5 @@ temp_*
 temp/
 
 *.BAK
+
+node_modules
