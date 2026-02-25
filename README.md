@@ -2,6 +2,19 @@
 
 At its core, this demo relies on a strong, general-purpose, reasoning LLM and an MCP server with specialized tools. The LLM must be capable of doing multistep tool calling; such capabilities are simplified by using an LLM agent that is stateful. We demonstrate the use of the revamped MCP server using 2 LLMs: locally served `gpt-oss-120b` or Claude Sonnet.
 
+## Table of Contents
+1. [Conceptual Reframing](#conceptual-reframing)
+1. [Revamped MCP Architecture](#revamped-mcp-architecture)
+    1. [Guiding Use Cases](#guiding-use-cases)
+    1. [Modularization and Reusable Components](#modularization-and-reusable-components)
+    1. [MCP Design Considerations](#mcp-design-considerations)
+1. [Running the Demos](#running-the-demos)
+    1. [Everything Locally-Served](#everything-locally-served)
+    1. [Connecting QAG MCP to Claude Desktop](#connecting-qag-mcp-to-claude-desktop)
+1. [Extending QAG with Cohort Copilot](#extending-qag-with-cohort-copilot)
+    1. [Making Minimal Changes](#making-minimal-changes)
+1. [To Do](#to-do)
+
 ## Conceptual Reframing
 
 This demo serves to modernize the Query Augmented Generation (QAG) framework using contemporary agentic concepts. The first iteration of QAG relied on a custom LLM to infer the intent of user queries. After categorizing the intent, a secondary model and static retrieval system were used to gather the entities required to query the GDC API. Manual routing and orchestration using the intent and entities was done to construct and execute the GDC API queries. Finally, the resulting information was parsed by a tertiary LLM for final return to the user. These steps are fragile and do not scale well: the custom model to infer user intent was trained on poorly generated, templated synthetic queries for a small subset of tasks; additional tasks require manual curation of entity maps as well as custom router logic; and tasks are hard-coded and result in code duplication without sufficient modularization.
@@ -145,7 +158,7 @@ These minor changes to enable arbitrary cohort descriptions allow answering exte
 
 > for patients with mutation in KRAS, what is the difference in prevalence between male vs female patients?
 
-### Making Changes
+### Making Minimal Changes
 
 When making changes to an MCP toolset, consider the [design principles](#mcp-design-considerations) we discussed. In a nutshell, when we change the case retrieval tool from project filtering to arbitrary cohort descriptions, we needed to update the following things:
 * the actual filter logic
