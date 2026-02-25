@@ -101,6 +101,10 @@ python src/agent.py -p 8002 --mcp-url "http://localhost:8001/mcp" --llm-url "htt
 
 If you are running the servers on a remote host, you can use ssh tunneling to forward the remote port of the agent UI server to your local so you can access the UI on your local.
 
+#### Local LLM Agent Limitations
+
+Even using `gpt-oss-120b`, open-weight models tend to still be behind frontier models (like those that back the Claudes, ChatGPTs, and Geminis). Of course, the local agent could switch backends but we tend to want to use a local LLM with a local agent. One salient example of this difference in capability that came up in testing was letting the model do math directly in natural language. It was okay, but it would sometimes prematurely terminate. Our solution was to just add basic arithmetic tools directly to the agent which seems to have resolved the math computation limitation.
+
 ### Connecting QAG MCP to Claude Desktop
 
 If you don't have access to a high-capacity GPU, you can still test out the demo by connecting the MCP server to a frontier-model provider (honestly, these resutls tend to be stronger). This section specifically details how to test out the MCP tools using Claude Desktop. At the time of writing, you can do all these steps with just a free-tier account.

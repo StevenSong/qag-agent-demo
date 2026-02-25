@@ -20,16 +20,47 @@ def make_agent(
     )
     if output_type is None:
         output_type = str
-    return Agent(
+    agent = Agent(
         model,
         toolsets=[toolset],
         instructions=(
             "You are a helpful bioinformatics assistant with access to specialized "
             "tools to query information about genetic mutations using the Genomic Data Commons (GDC). "
-            "Use the tools to answer questions. Multiple chained tool calls may be required to answer a question."
+            "Use the tools to answer questions. Multiple chained tool calls may be required to answer a question. "
+            "Also math is hard for LLMs to do in natural language. If you need to do arithmetic, just use the tools."
         ),
         output_type=output_type,
     )
+
+    @agent.tool_plain
+    def add(a: float, b: float) -> float:
+        """
+        compute a + b
+        """
+        return a + b
+
+    @agent.tool_plain
+    def subtract(a: float, b: float) -> float:
+        """
+        compute a - b
+        """
+        return a - b
+
+    @agent.tool_plain
+    def multiply(a: float, b: float) -> float:
+        """
+        compute a * b
+        """
+        return a * b
+
+    @agent.tool_plain
+    def divide(a: float, b: float) -> float:
+        """
+        compute a / b
+        """
+        return a / b
+
+    return agent
 
 
 if __name__ == "__main__":
