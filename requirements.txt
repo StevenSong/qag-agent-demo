@@ -1,8 +1,4 @@
-langchain
-langchain-mcp-adapters
-langchain-ollama
-langgraph-cli[inmem]
-copilotkit
+pydantic-ai
 jupyterlab
 ipywidgets
 cachetools
