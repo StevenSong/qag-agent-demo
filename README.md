@@ -69,8 +69,8 @@ We demonstrate two ways of utilizing agentic QAG:
 
 This example requires a high-capacity GPU (at minimum an NVIDIA A100 80GB) to serve the reasoning model `gpt-oss-120b`. Less capable open-weight models may also be used but results do improve with stronger reasoning and multistep planning capabilities. For this method, we use the following tools:
 * `openai/gpt-oss-120b` as our reasoning model
-* `docker` to run containerized `ollama` (which serves the LLM)
-* `FastMCP` to define our MCP server
+* `vLLM` to serves the LLM
+* `FastMCP` to create our MCP server
 * `pydantic-ai` to create our agent and to provide a UI
 
 #### Setup
@@ -87,9 +87,10 @@ conda activate qag-agent-demo
 Once you've setup and activated your environment, start the ollama, MCP, and agent UI servers before opening the agent UI in your browser:
 ```bash
 # start the vLLM server, change the GPU index as needed
+# you can also use docker to serve vllm though there are some FIPS issues if you need to care about those
 CUDA_VISIBLE_DEVICES=0 vllm serve openai/gpt-oss-120b --port 8000 --enable-auto-tool-choice --tool-call-parser openai
 
-# start the MCP server
+# start the MCP server (in a separate terminal window)
 python src/server.py -t streamable-http -p 8001
 
 # start the agent UI server (in a separate terminal window)
@@ -138,7 +139,7 @@ If you don't have access to a high-capacity GPU, you can still test out the demo
 
 One of the key aspects of the redesign of QAG is its modularity. The `get_cases_by_project` tool simply queries the GDC's `/cases` endpoint with a manually constructed filter on the project ID. However, we already have a tool that makes arbitrary filters for the `/cases` endpoint: [GDC Cohort Copilot](https://github.com/uc-cdis/gdc-cohort-copilot). We demonstrate how we can use cohort copilot as a dropin replacement and generalization for the case retrieval. To that end, we provide an alternate version of the MCP server in `src/server-w-cohort-copilot.py`.
 
-**NOTE:** GDC Cohort Copilot is undergoing major revisions (just like QAG)! The first version of cohort copilot utilized an ultralightweight GPT2 model that can run on CPU. We use that version here for this demo, however this requires some extra dependencies that should be installed:
+**NOTE:** GDC Cohort Copilot is undergoing major revisions (just like QAG)! The first version of cohort copilot utilized an ultralightweight GPT2 model that can run on CPU-only. We use that version here for this demo, however this requires some extra dependencies that should be installed:
 
 ```bash
 pip install -r requirements-cohort-copilot.txt
@@ -146,7 +147,7 @@ pip install -r requirements-cohort-copilot.txt
 
 Once installed, just replace `src/server.py` with `src/server-w-cohort-copilot.py` when starting up the MCP server (either with locally hosted agents or in your MCP server config for external tools).
 
-To visualize the minimal difference between the two implementations, you can use compare the two files using the below command:
+To visualize the minimal difference between the two implementations, you can compare the two files using the below command:
 ```bash
 git diff --no-index -- src/server.py src/server-w-cohort-copilot.py
 ```
@@ -154,6 +155,8 @@ git diff --no-index -- src/server.py src/server-w-cohort-copilot.py
 These minor changes to enable arbitrary cohort descriptions allow answering extensively more questions while reusing almost entirely the same tools/code! For example, try out this query:
 
 > for patients with mutation in KRAS, what is the difference in prevalence between male vs female patients?
+
+Note that if you do have a CUDA enabled GPU on your machine, `src/server-w-cohort-copilot.py` will try to put the cohort copilot model onto the GPU (though GPU is not necessary for the cohort copilot model). The model is relatively tiny but if you need to be aware of GPU resources, or if you need to control which GPU the model uses on a multi-gpu system, use the standard `CUDA_VISIBLE_DEVICES` env var while launching `src/server-w-cohort-copilot.py`.
 
 ### Making Minimal Changes
 
