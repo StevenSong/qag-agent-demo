@@ -1,6 +1,4 @@
-pydantic-ai
-jupyterlab
 ipywidgets
-cachetools
+jupyterlab
 pre-commit
 detect-secrets

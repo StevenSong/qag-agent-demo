@@ -75,7 +75,7 @@ This example requires a high-capacity GPU (at minimum an NVIDIA A100 80GB) to se
 
 #### Setup
 
-Clone this repo and setup your environment. We use conda below but you can alternatively use any other virtual environment manager (eg `uv`) and install directly from `requirements.txt`. If you use something other than conda, make sure to use the same python version (`3.12.12`).
+Clone this repo and setup your environment. We use conda below but you can alternatively use any other virtual environment manager (eg `uv`) and install directly from the various requirement files. If you use something other than conda, make sure to use the same python version (`3.12.12`).
 
 ```
 conda create -f env.yaml
@@ -86,22 +86,19 @@ conda activate qag-agent-demo
 
 Once you've setup and activated your environment, start the ollama, MCP, and agent UI servers before opening the agent UI in your browser:
 ```bash
-# start the ollama server, change the GPU index as needed
-docker run -d --rm --gpus='"device=0"' -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
-docker exec ollama ollama run gpt-oss:120b
+# start the vLLM server, change the GPU index as needed
+CUDA_VISIBLE_DEVICES=0 vllm serve openai/gpt-oss-120b --port 8000 --enable-auto-tool-choice --tool-call-parser openai
 
 # start the MCP server
-python src/server.py -t streamable-http
+python src/server.py -t streamable-http -p 8001
 
 # start the agent UI server (in a separate terminal window)
-uvicorn src.agent:app --port 8001
+python src/agent.py -p 8002 --mcp-url "http://localhost:8001/mcp" --llm-url "http://localhost:8000/v1"
 
-# go to http://localhost:8001 in a browser and query away
+# go to http://localhost:8002 in a browser and query away
 ```
 
-If you are running the servers on a remote host, you can use ssh tunneling to forward the remote port to your local so you can access the UI on your local.
-
-Note that the ollama server runs on port `11434`, the MCP server runs on port `8000`, and the agent UI server runs on port `8001`. As this is a demo, if you need to remap the ports, you will need to do so manually. The ollama port within the docker container does not necessarily need to change, you just have to remap the port on the host machine (so change the flag `-p HOST_PORT:11434`). The MCP port is hardcoded in both `src/server.py` and `src/agent.py`. The agent UI port can be toggled via the command line.
+If you are running the servers on a remote host, you can use ssh tunneling to forward the remote port of the agent UI server to your local so you can access the UI on your local.
 
 ### Connecting QAG MCP to Claude Desktop
 
@@ -114,7 +111,7 @@ If you don't have access to a high-capacity GPU, you can still test out the demo
     git clone git@github.com:StevenSong/qag-agent-demo.git
     cd qag-agent-demo
     uv venv --python 3.12.12
-    uv pip install -r requirements.txt
+    uv pip install -r requirements-mcp.txt
     ```
 1. Open Claude Desktop, go to Settings > Developer > Edit Config, and open the file `claude_desktop_config.json` in your favorite text editor
 1. Add the following section to your JSON config file, note that you should provide absolute paths for `uv` and `qag-agent-demo`:
@@ -144,7 +141,7 @@ One of the key aspects of the redesign of QAG is its modularity. The `get_cases_
 **NOTE:** GDC Cohort Copilot is undergoing major revisions (just like QAG)! The first version of cohort copilot utilized an ultralightweight GPT2 model that can run on CPU. We use that version here for this demo, however this requires some extra dependencies that should be installed:
 
 ```bash
-pip install transformers guidance torch
+pip install -r requirements-cohort-copilot.txt
 ```
 
 Once installed, just replace `src/server.py` with `src/server-w-cohort-copilot.py` when starting up the MCP server (either with locally hosted agents or in your MCP server config for external tools).

@@ -1,6 +1,7 @@
 import json
 import os
 
+import torch
 from guidance import json as gen_json
 from guidance.models import Transformers
 from transformers import AutoTokenizer, GPT2LMHeadModel, set_seed
@@ -14,7 +15,7 @@ MODEL_READ_TOKEN = os.environ.get("MODEL_READ_TOKEN", None)
 
 tok = AutoTokenizer.from_pretrained(TOKENIZER_NAME, token=MODEL_READ_TOKEN)
 model = GPT2LMHeadModel.from_pretrained(MODEL_NAME, token=MODEL_READ_TOKEN)
-model = model.to("cpu")
+model = model.to("cuda" if torch.cuda.is_available() else "cpu")
 model = model.eval()
 
 
