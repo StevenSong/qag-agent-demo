@@ -1,1 +1,3 @@
 pydantic-ai
+pandas
+tqdm
