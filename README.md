@@ -80,7 +80,7 @@ docker exec ollama ollama run gpt-oss:120b
 # start the MCP server
 python src/server.py -t streamable-http
 
-# start the agent UI server
+# start the agent UI server (in a separate terminal window)
 uvicorn src.agent:app --port 8001
 
 # go to http://localhost:8001 in a browser and query away
