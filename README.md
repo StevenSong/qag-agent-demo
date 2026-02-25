@@ -46,6 +46,8 @@ When architecting the MCP tools, we consider the following design criteria and h
 * However, LLMs still have (lots of) limitations, including non-natural language text, context window length, and potentially long context forgetting, so tools should avoid injecting text that may exacerbate these known LLM limitations.
     * e.g. Case sets are cached server side in a TTL cache, preventing context window clutter with lists of non-natural language case UUIDs.
 
+Take a look at the [Extending QAG with Cohort Copilot](#extending-qag-with-cohort-copilot) section for an example of the modularity we've designed!
+
 ## Running the Demos
 
 We demonstrate two ways of utilizing agentic QAG:
@@ -121,3 +123,34 @@ If you don't have access to a high-capacity GPU, you can still test out the demo
 1. Restart Claude Desktop (must fully close the application to reload the config)
 1. Verify that the `gdc` MCP server has started by checking the enabled "Connectors" (from the main prompt UI, click the `+` sign in the lower left, Connectors submenu)
 1. Try the example queries (you'll need to approve the tool usage through the UI)
+
+## Extending QAG with Cohort Copilot
+
+One of the key aspects of the redesign of QAG is its modularity. The `get_cases_by_project` tool simply queries the GDC's `/cases` endpoint with a manually constructed filter on the project ID. However, we already have a tool that makes arbitrary filters for the `/cases` endpoint: [GDC Cohort Copilot](https://github.com/uc-cdis/gdc-cohort-copilot). We demonstrate how we can use cohort copilot as a dropin replacement and generalization for the case retrieval. To that end, we provide an alternate version of the MCP server in `src/server-w-cohort-copilot.py`.
+
+**NOTE:** GDC Cohort Copilot is undergoing major revisions (just like QAG)! The first version of cohort copilot utilized an ultralightweight GPT2 model that can run on CPU. We use that version here for this demo, however this requires some extra dependencies that should be installed:
+
+```bash
+pip install transformers guidance torch
+```
+
+Once installed, just replace `src/server.py` with `src/server-w-cohort-copilot.py` when starting up the MCP server (either with locally hosted agents or in your MCP server config for external tools).
+
+To visualize the minimal difference between the two implementations, you can use compare the two files using the below command:
+```bash
+git diff --no-index -- src/server.py src/server-w-cohort-copilot.py
+```
+
+These minor changes to enable arbitrary cohort descriptions allow answering extensively more questions while reusing almost entirely the same tools/code! For example, try out this query:
+
+> for patients with mutation in KRAS, what is the difference in prevalence between male vs female patients?
+
+## To Do
+
+* Add `genes` endpoint, consider these examples:
+    * What is the variance of MYC expression across projects?
+    * Is PD-L1 (CD274) higher in male vs female patients?
+    * Is MYC expression higher in smokers?
+    * Does EGFR expression differ by stage?
+    * Is KRAS more highly expressed in pancreatic vs lung cancer?
+* Add `survival` endpoint
