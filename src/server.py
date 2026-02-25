@@ -9,16 +9,6 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import Field
 
-mcp = FastMCP(
-    name="GDC API MCP Server",
-    instructions=(
-        "Use the tools of this server to answer questions about genomic variant statistics from data in the GDC. "
-        "Currently, we support querying cases by simple somatic mutation, copy number variant, and microsatellite instability. "
-        "Queried case sets are cached server-side. Case set intersection is additionally provided server side. "
-        "Case counts can be returned for any retrieved or computed case sets."
-    ),
-)
-
 case_cache = TTLCache(maxsize=1000, ttl=3600)
 GDC_API = "https://api.gdc.cancer.gov"
 
@@ -81,21 +71,22 @@ Gene = Annotated[
     ),
 ]
 AAChange = Annotated[
-    str,
+    str | None,
     Field(
-        description="Amino acid change to query (in HGVS protein notation), for example 'V600E'.",
+        description="(Optional) Amino acid change to query (in HGVS protein notation), for example 'V600E'.",
     ),
 ]
 CNVChange = Annotated[
-    Literal["gain", "amplification", "heterozygous deletion", "homozygous deletion"],
+    Literal["gain", "amplification", "heterozygous deletion", "homozygous deletion"]
+    | None,
     Field(
-        description="Copy number variation change to query, for example 'homozygous deletion'.",
+        description="(Optional) Copy number variation change to query. Valid options are 'gain', 'amplification', 'heterozygous deletion', or 'homozygous deletion'.",
     ),
 ]
 MSIStatus = Annotated[
     Literal["msi", "mss"],
     Field(
-        description="Microsatellite instability status, 'msi' = microsatellite instable, 'MSS' = microsatellite stable",
+        description="Microsatellite instability status. Valid options are 'msi' for microsatellite instable or 'mss' for microsatellite stable.",
     ),
 ]
 CaseSetId = Annotated[
@@ -116,10 +107,9 @@ CaseCount = Annotated[
 ]
 
 
-@mcp.tool()
 def get_simple_somatic_mutation_occurrences(
     gene: Gene,
-    aa_change: AAChange | None = None,
+    aa_change: AAChange = None,
 ) -> CaseSetId:
     """
     A tool to query the GDC API for cases with simple somatic mutations (SSMs).
@@ -182,10 +172,9 @@ def get_simple_somatic_mutation_occurrences(
     return cache_id
 
 
-@mcp.tool()
 def get_copy_number_variant_occurrences(
     gene: Gene,
-    cnv_change: CNVChange | None = None,
+    cnv_change: CNVChange = None,
 ) -> CaseSetId:
     """
     A tool to query the GDC API for cases with copy number variations (CNVs).
@@ -252,7 +241,6 @@ def get_copy_number_variant_occurrences(
     return cache_id
 
 
-@mcp.tool()
 def get_microsatellite_instability_occurrences(
     msi_status: MSIStatus = "msi",
 ) -> CaseSetId:
@@ -300,7 +288,6 @@ def get_microsatellite_instability_occurrences(
     return cache_id
 
 
-@mcp.tool()
 def get_cases_by_project(project: Project) -> CaseSetId:
     """
     A tool to query the GDC API for cases of a project, for example 'TCGA-BRCA'.
@@ -335,7 +322,6 @@ def get_cases_by_project(project: Project) -> CaseSetId:
     return cache_id
 
 
-@mcp.tool()
 def compute_case_intersection(
     case_set_id_A: CaseSetId,
     case_set_id_B: CaseSetId,
@@ -374,7 +360,6 @@ def compute_case_intersection(
     return cache_id
 
 
-@mcp.tool()
 def get_case_set_size(
     case_set_id: CaseSetId,
 ) -> CaseCount:
@@ -436,7 +421,35 @@ def suggest_tool_from_case_set_id(case_set_id: CaseSetId) -> str:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-t", "--transport", required=True, choices=["sse", "stdio", "streamable-http"]
+        "-t",
+        "--transport",
+        required=True,
+        choices=["sse", "stdio", "streamable-http"],
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=8000,
     )
     args = parser.parse_args()
+
+    mcp = FastMCP(
+        name="GDC API MCP Server",
+        instructions=(
+            "Use the tools of this server to answer questions about genomic variant statistics from data in the GDC. "
+            "Currently, we support querying cases by simple somatic mutation, copy number variant, and microsatellite instability. "
+            "Queried case sets are cached server-side. Case set intersection is additionally provided server side. "
+            "Case counts can be returned for any retrieved or computed case sets."
+        ),
+        port=args.port,
+    )
+
+    mcp.add_tool(get_simple_somatic_mutation_occurrences)
+    mcp.add_tool(get_copy_number_variant_occurrences)
+    mcp.add_tool(get_microsatellite_instability_occurrences)
+    mcp.add_tool(get_cases_by_project)
+    mcp.add_tool(compute_case_intersection)
+    mcp.add_tool(get_case_set_size)
+
     mcp.run(transport=args.transport)
