@@ -145,6 +145,14 @@ These minor changes to enable arbitrary cohort descriptions allow answering exte
 
 > for patients with mutation in KRAS, what is the difference in prevalence between male vs female patients?
 
+### Making Changes
+
+When making changes to an MCP toolset, consider the [design principles](#mcp-design-considerations) we discussed. In a nutshell, when we change the case retrieval tool from project filtering to arbitrary cohort descriptions, we needed to update the following things:
+* the actual filter logic
+* the tool description
+* the parameter description
+* the error handling
+
 ## To Do
 
 * Add `genes` endpoint, consider these examples:
