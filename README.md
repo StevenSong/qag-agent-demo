@@ -100,17 +100,16 @@ If you don't have access to a high-capacity GPU, you can still test out the demo
     cd qag-agent-demo
     uv venv --python 3.12.12
     uv pip install -r requirements.txt
-    source .venv/bin/activate
     ```
 1. Open Claude Desktop, go to Settings > Developer > Edit Config, and open the file `claude_desktop_config.json` in your favorite text editor
 1. Add the following section to your JSON config file, note that you should provide absolute paths for `uv` and `qag-agent-demo`:
     ```
     "mcpServers": {
         "gdc": {
-            "command": "/path/to/uv"
+            "command": "/full/path/to/uv"
             "args": [
                 "--directory",
-                "/path/to/qag-agent-demo/src",
+                "/full/path/to/qag-agent-demo/src",
                 "run",
                 "server.py",
                 "-t",
