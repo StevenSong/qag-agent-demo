@@ -1,32 +1,37 @@
 import argparse
 
 import uvicorn
-from pydantic_ai import Agent
+from pydantic_ai import Agent, ConcurrencyLimit
+from pydantic_ai.mcp import MCPServerStreamableHTTP
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
-from pydantic_ai.toolsets.fastmcp import FastMCPToolset
 
 
 def make_agent(
     mcp_url: str,
     llm_url: str,
     retries: int = 1,
+    max_running: int = 4,
+    max_queued: int = 8,
 ) -> Agent:
-    toolset = FastMCPToolset(mcp_url)
+    mcp_server = MCPServerStreamableHTTP(mcp_url)
     model = OpenAIChatModel(
         model_name="openai/gpt-oss-120b",
         provider=OpenAIProvider(base_url=llm_url, api_key="NONE"),
     )
     agent = Agent(
         model,
-        toolsets=[toolset],
+        toolsets=[mcp_server],
         instructions=(
             "You are a helpful bioinformatics assistant with access to specialized "
             "tools to query information about genetic mutations using the Genomic Data Commons (GDC). "
             "Use the tools to answer questions. Multiple chained tool calls may be required to answer a question. "
+            "If a user query is ambiguous, stop and ask them to clarify before trying to find the answer. "
             "Also math is hard for LLMs to do in natural language. If you need to do arithmetic, just use the tools."
         ),
-        max_concurrency=4,
+        max_concurrency=ConcurrencyLimit(
+            max_running=max_running, max_queued=max_queued
+        ),
         retries=retries,
     )
 
@@ -57,6 +62,10 @@ def make_agent(
         compute a / b
         """
         return a / b
+
+    @agent.instructions
+    async def mcp_server_instructions():
+        return mcp_server.instructions
 
     return agent
 

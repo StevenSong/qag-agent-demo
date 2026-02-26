@@ -305,6 +305,8 @@ def get_cases_by_cohort_description(cohort_description: CohortDescription) -> Ca
     """
     A tool to query the GDC API for cases of a described cohort, for example 'cases from the TCGA-BRCA project' or 'cases of non-smoking patients'.
     The resulting case set is cached server side and can be referenced using the unique identifier returned by this tool.
+    While this tool can take natural language inputs, it is best used with very simple, single attribute descriptions.
+    Do NOT provide gene filters to this tool.
     """
     print(
         f"get_cases_by_cohort_description(cohort_description={repr(cohort_description)})",
@@ -377,6 +379,44 @@ def compute_case_intersection(
     return cache_id
 
 
+def compute_case_union(
+    case_set_id_A: CaseSetId,
+    case_set_id_B: CaseSetId,
+) -> CaseSetId:
+    """
+    A tool to compute the union between two case sets.
+    The resulting unioned case set is cached server side and can be referenced using the unique identifier returned by this tool.
+    """
+    print(
+        f"compute_case_union(case_set_id_A={repr(case_set_id_A)}, case_set_id_B={repr(case_set_id_B)})",
+        file=sys.stderr,
+    )
+
+    cache_id = f"Cases-Union-({case_set_id_A})-AND-({case_set_id_B})"
+
+    # if we've already done this retrieval, refresh it in the cache and shortcut return
+    if cache_id in case_cache:
+        case_cache[cache_id] = case_cache[cache_id]
+        return cache_id
+
+    for case_set_id in [case_set_id_A, case_set_id_B]:
+        if case_set_id not in case_cache:
+            raise ToolError(
+                f"Case set {case_set_id} was not found in the server side cache, perhaps it expired? "
+                f"Try requerying for those cases to cache it again. {suggest_tool_from_case_set_id(case_set_id)}"
+            )
+        # refresh the subsets since we're using them
+        case_cache[case_set_id] = case_cache[case_set_id]
+
+    cases_A = set(case_cache[case_set_id_A])
+    cases_B = set(case_cache[case_set_id_B])
+
+    A_and_B = cases_A | cases_B
+    case_cache[cache_id] = list(A_and_B)
+
+    return cache_id
+
+
 def get_case_set_size(
     case_set_id: CaseSetId,
 ) -> CaseCount:
@@ -404,6 +444,9 @@ def get_case_set_size(
 TOOL_TO_CACHE_ID_PATTERN = {
     "compute_case_intersection": re.compile(
         r"Cases-Intersect-\((?P<case_set_id_A>.+)\)-AND-\((?P<case_set_id_B>.+)\)",
+    ),
+    "compute_case_union": re.compile(
+        r"Cases-Union-\((?P<case_set_id_A>.+)\)-AND-\((?P<case_set_id_B>.+)\)",
     ),
     "get_simple_somatic_mutation_occurrences": re.compile(
         r"Cases-SSM-(?P<gene>[^-]+)(?:-(?P<aa_change>.+))?",
@@ -454,9 +497,13 @@ if __name__ == "__main__":
     mcp = FastMCP(
         name="GDC API MCP Server",
         instructions=(
-            "Use the tools of this server to answer questions about genomic variant statistics from data in the GDC. "
+            "Use the tools of the GDC MCP server to answer questions about genomic variant statistics from data in the GDC. "
             "Currently, we support querying cases by simple somatic mutation, copy number variant, and microsatellite instability. "
-            "Queried case sets are cached server-side. Case set intersection is additionally provided server side. "
+            "Do not assume that 'mutation' simply means somatic mutation, even if given a specific gene (it's also valid to query for CNV mutations in a gene). "
+            "Since somatic mutations and copy number variation can both be considered mutations but this may be ambiguous, "
+            "so if a user asks for 'mutations' without further specification, you should always stop and clarify with the user. "
+            "You should never make the assumption about what the user means. "
+            "Queried case sets are cached server-side. Case set intersection and union is additionally provided server side. "
             "Case counts can be returned for any retrieved or computed case sets."
         ),
         port=args.port,
@@ -467,6 +514,7 @@ if __name__ == "__main__":
     mcp.add_tool(get_microsatellite_instability_occurrences)
     mcp.add_tool(get_cases_by_cohort_description)
     mcp.add_tool(compute_case_intersection)
+    mcp.add_tool(compute_case_union)
     mcp.add_tool(get_case_set_size)
 
     mcp.run(transport=args.transport)

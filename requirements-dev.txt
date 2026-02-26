@@ -2,3 +2,6 @@ ipywidgets
 jupyterlab
 pre-commit
 detect-secrets
+pandas
+tqdm
+pqdm
