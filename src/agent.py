@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import uvicorn
 from pydantic_ai import Agent, ConcurrencyLimit
@@ -91,7 +92,8 @@ if __name__ == "__main__":
 
     if args.query is None:
         # server the agent with a UI
-        app = agent.to_web()
+        rel_dir = os.path.dirname(__file__)
+        app = agent.to_web(html_source=os.path.join(rel_dir, "static/index.html"))
         port = 8000  # default
         if args.port is not None:
             port = args.port
