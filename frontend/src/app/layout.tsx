@@ -18,7 +18,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={"antialiased"}>
         <CopilotKit
-          runtimeUrl="/api/copilotkit"
+          runtimeUrl={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/copilotkit`}
           agent="qag_agent"
           showDevConsole={false}
           enableInspector={false}

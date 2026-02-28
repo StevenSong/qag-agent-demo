@@ -109,6 +109,9 @@ cd frontend
 npm run build
 AGENT_URL="http://localhost:8003" npm run start -- -p 8002
 
+# if you need to serve the frontend app behind a reverse proxy that does not strip the app prefix, you'll need to set the root path via NEXT_PUBLIC_BASE_PATH
+NEXT_PUBLIC_BASE_PATH=/qag-v2 AGENT_URL="http://localhost:8003/" npm run dev -- -p 8002
+
 # go to http://localhost:8002 in a browser and query away
 ```
 
