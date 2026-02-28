@@ -110,7 +110,14 @@ npm run build
 AGENT_URL="http://localhost:8003" npm run start -- -p 8002
 
 # if you need to serve the frontend app behind a reverse proxy that does not strip the app prefix, you'll need to set the root path via NEXT_PUBLIC_BASE_PATH
-NEXT_PUBLIC_BASE_PATH=/qag-v2 AGENT_URL="http://localhost:8003/" npm run dev -- -p 8002
+AGENT_URL="http://localhost:8003/" npm run dev -- -p 8002
+
+# note that if you're building the app, the base path must be set at both build and start time
+NEXT_PUBLIC_BASE_PATH=/prefix npm run build
+NEXT_PUBLIC_BASE_PATH=/prefix AGENT_URL="http://localhost:8003" npm run start -- -p 8002
+
+# I'm not a software engineer so the frontend app was mostly vibe coded and based off this example:
+# https://github.com/CopilotKit/with-pydantic-ai
 
 # go to http://localhost:8002 in a browser and query away
 ```
