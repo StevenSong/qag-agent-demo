@@ -71,15 +71,19 @@ This example requires a high-capacity GPU (at minimum an NVIDIA A100 80GB) to se
 * `openai/gpt-oss-120b` as our reasoning model
 * `vLLM` to serves the LLM
 * `FastMCP` to create our MCP server
-* `pydantic-ai` to create our agent and to provide a UI
+* `pydantic-ai` to create our agent and to provide an AG-UI server
+* `CopilotKit` to create our UI app server
 
 #### Setup
 
 Clone this repo and setup your environment. We use conda below but you can alternatively use any other virtual environment manager (eg `uv`) and install directly from the various requirement files. If you use something other than conda, make sure to use the same python version (`3.12.12`).
 
-```
+```bash
 conda create -f env.yaml
 conda activate qag-agent-demo
+
+cd frontend
+npm install
 ```
 
 #### Run Servers
@@ -91,15 +95,24 @@ Once you've setup and activated your environment, start the ollama, MCP, and age
 CUDA_VISIBLE_DEVICES=0 vllm serve openai/gpt-oss-120b --port 8000 --enable-auto-tool-choice --tool-call-parser openai
 
 # start the MCP server (in a separate terminal window)
-python src/server.py -t streamable-http -p 8001
+python qag-mcp/server.py -t streamable-http -p 8001
 
-# start the agent UI server (in a separate terminal window)
-python src/agent.py -p 8002 --mcp-url "http://localhost:8001/mcp" --llm-url "http://localhost:8000/v1"
+# start the agent AG-UI server (in a separate terminal window)
+python agent/agent.py -p 8003 --mcp-url "http://localhost:8001/mcp" --llm-url "http://localhost:8000/v1"
+
+# start the UI app server (in a separate terminal window)
+cd frontend
+AGENT_URL="http://localhost:8003" npm run dev -- -p 8002
+
+# alternatively, you can build and serve the frontend app
+cd frontend
+npm run build
+AGENT_URL="http://localhost:8003" npm run start -- -p 8002
 
 # go to http://localhost:8002 in a browser and query away
 ```
 
-If you are running the servers on a remote host, you can use ssh tunneling to forward the remote port of the agent UI server to your local so you can access the UI on your local.
+If you are running the servers on a remote host, you can use ssh tunneling to forward the remote port of the app server to your local so you can access the UI on your local.
 
 #### Local LLM Agent Limitations
 
@@ -141,7 +154,7 @@ If you don't have access to a high-capacity GPU, you can still test out the demo
 
 ## Extending QAG with Cohort Copilot
 
-One of the key aspects of the redesign of QAG is its modularity. The `get_cases_by_project` tool simply queries the GDC's `/cases` endpoint with a manually constructed filter on the project ID. However, we already have a tool that makes arbitrary filters for the `/cases` endpoint: [GDC Cohort Copilot](https://github.com/uc-cdis/gdc-cohort-copilot). We demonstrate how we can use cohort copilot as a dropin replacement and generalization for the case retrieval. To that end, we provide an alternate version of the MCP server in `src/server-w-cohort-copilot.py`.
+One of the key aspects of the redesign of QAG is its modularity. The `get_cases_by_project` tool simply queries the GDC's `/cases` endpoint with a manually constructed filter on the project ID. However, we already have a tool that makes arbitrary filters for the `/cases` endpoint: [GDC Cohort Copilot](https://github.com/uc-cdis/gdc-cohort-copilot). We demonstrate how we can use cohort copilot as a dropin replacement and generalization for the case retrieval. To that end, we provide an alternate version of the MCP server in `qag-mcp/server-w-cohort-copilot.py`.
 
 **NOTE:** GDC Cohort Copilot is undergoing major revisions (just like QAG)! The first version of cohort copilot utilized an ultralightweight GPT2 model that can run on CPU-only. We use that version here for this demo, however this requires some extra dependencies that should be installed:
 
@@ -149,18 +162,18 @@ One of the key aspects of the redesign of QAG is its modularity. The `get_cases_
 pip install -r requirements-cohort-copilot.txt
 ```
 
-Once installed, just replace `src/server.py` with `src/server-w-cohort-copilot.py` when starting up the MCP server (either with locally hosted agents or in your MCP server config for external tools).
+Once installed, just replace `qag-mcp/server.py` with `qag-mcp/server-w-cohort-copilot.py` when starting up the MCP server (either with locally hosted agents or in your MCP server config for external tools).
 
 To visualize the minimal difference between the two implementations, you can compare the two files using the below command:
 ```bash
-git diff --no-index -- src/server.py src/server-w-cohort-copilot.py
+git diff --no-index -- qag-mcp/server.py qag-mcp/server-w-cohort-copilot.py
 ```
 
 These minor changes to enable arbitrary cohort descriptions allow answering extensively more questions while reusing almost entirely the same tools/code! For example, try out this query:
 
 > for patients with mutation in KRAS, what is the difference in prevalence between male vs female patients?
 
-Note that if you do have a CUDA enabled GPU on your machine, `src/server-w-cohort-copilot.py` will try to put the cohort copilot model onto the GPU (though GPU is not necessary for the cohort copilot model). The model is relatively tiny but if you need to be aware of GPU resources, or if you need to control which GPU the model uses on a multi-gpu system, use the standard `CUDA_VISIBLE_DEVICES` env var while launching `src/server-w-cohort-copilot.py`.
+Note that if you do have a CUDA enabled GPU on your machine, `qag-mcp/server-w-cohort-copilot.py` will try to put the cohort copilot model onto the GPU (though GPU is not necessary for the cohort copilot model). The model is relatively tiny but if you need to be aware of GPU resources, or if you need to control which GPU the model uses on a multi-gpu system, use the standard `CUDA_VISIBLE_DEVICES` env var while launching `qag-mcp/server-w-cohort-copilot.py`.
 
 ### Making Minimal Changes
 
