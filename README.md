@@ -153,7 +153,7 @@ If you don't have access to a high-capacity GPU, you can still test out the demo
     ```
     "mcpServers": {
         "gdc": {
-            "command": "/full/path/to/uv"
+            "command": "/full/path/to/uv",
             "args": [
                 "--directory",
                 "/full/path/to/qag-agent-demo",
