@@ -16,7 +16,11 @@ from ._defines import (
     MSIStatus,
     Project,
 )
-from ._utils import gdc_query_all, suggest_tool_from_case_set_id
+from ._utils import (
+    gdc_query_all,
+    get_tool_case_set_id_template,
+    suggest_tool_from_case_set_id,
+)
 
 case_cache = TTLCache(maxsize=1000, ttl=3600)
 
@@ -35,9 +39,7 @@ def get_simple_somatic_mutation_occurrences(
         file=sys.stderr,
     )
 
-    cache_id = f"Cases-SSM-{gene}"
-    if aa_change is not None:
-        cache_id = f"{cache_id}-{aa_change}"
+    cache_id = get_tool_case_set_id_template().format(gene=gene, aa_change=aa_change)
 
     # if we've already done this retrieval, refresh it in the cache and shortcut return
     if cache_id in case_cache:
@@ -100,9 +102,7 @@ def get_copy_number_variant_occurrences(
         file=sys.stderr,
     )
 
-    cache_id = f"Cases-CNV-{gene}"
-    if cnv_change is not None:
-        cache_id = f"{cache_id}-{cnv_change}"
+    cache_id = get_tool_case_set_id_template().format(gene=gene, cnv_change=cnv_change)
 
     # if we've already done this retrieval, refresh it in the cache and shortcut return
     if cache_id in case_cache:
@@ -168,7 +168,7 @@ def get_microsatellite_instability_occurrences(
         file=sys.stderr,
     )
 
-    cache_id = f"Cases-MSI-{msi_status}"
+    cache_id = get_tool_case_set_id_template().format(msi_status=msi_status)
 
     # if we've already done this retrieval, refresh it in the cache and shortcut return
     if cache_id in case_cache:
@@ -212,7 +212,7 @@ def get_cases_by_project(project: Project) -> CaseSetId:
         file=sys.stderr,
     )
 
-    cache_id = f"Cases-Project-{project}"
+    cache_id = get_tool_case_set_id_template().format(project=project)
 
     # if we've already done this retrieval, refresh it in the cache and shortcut return
     if cache_id in case_cache:
@@ -254,7 +254,9 @@ def make_cohort_copilot_tool(generate_filter):
             file=sys.stderr,
         )
 
-        cache_id = f"Cases-Cohort-{cohort_description}"
+        cache_id = get_tool_case_set_id_template().format(
+            cohort_description=cohort_description
+        )
 
         # if we've already done this retrieval, refresh it in the cache and shortcut return
         if cache_id in case_cache:
@@ -292,7 +294,9 @@ def compute_case_intersection(
         file=sys.stderr,
     )
 
-    cache_id = f"Cases-Intersect-({case_set_id_A})-AND-({case_set_id_B})"
+    cache_id = get_tool_case_set_id_template().format(
+        case_set_id_A=case_set_id_A, case_set_id_B=case_set_id_B
+    )
 
     # if we've already done this retrieval, refresh it in the cache and shortcut return
     if cache_id in case_cache:
@@ -330,7 +334,9 @@ def compute_case_union(
         file=sys.stderr,
     )
 
-    cache_id = f"Cases-Union-({case_set_id_A})-AND-({case_set_id_B})"
+    cache_id = get_tool_case_set_id_template().format(
+        case_set_id_A=case_set_id_A, case_set_id_B=case_set_id_B
+    )
 
     # if we've already done this retrieval, refresh it in the cache and shortcut return
     if cache_id in case_cache:

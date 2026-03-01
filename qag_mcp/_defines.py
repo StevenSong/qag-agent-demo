@@ -57,3 +57,13 @@ CaseCount = Annotated[
         description="Number of cases for a retrieved or computed case set.",
     ),
 ]
+
+TOOL_CACHE_ID_TEMPLATES = {
+    "compute_case_intersection": "Cases-Intersect-({case_set_id_A})-({case_set_id_B})",
+    "compute_case_union": "Cases-Union-({case_set_id_A})-({case_set_id_B})",
+    "get_simple_somatic_mutation_occurrences": "Cases-SSM-({gene})-({aa_change})",
+    "get_copy_number_variant_occurrences": "Cases-CNV-({gene})-({cnv_change})",
+    "get_microsatellite_instability_occurrences": "Cases-MSI-({msi_status})",
+    "get_cases_by_project": "Cases-Project-({project})",
+    "get_cases_by_cohort_description": "Cases-Cohort-({cohort_description})",
+}

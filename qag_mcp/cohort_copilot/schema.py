@@ -1,5 +1,5 @@
-import os
 from enum import Enum
+from importlib.resources import files
 from typing import Annotated, Literal, get_args, get_type_hints
 
 import yaml
@@ -61,7 +61,7 @@ for alt_inner in [
     field_type = get_type_hints(alt_inner)["field"]
     excluded_values |= set(get_args(field_type))
 
-rel_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+rel_path = files(__package__).joinpath("config.yaml")
 with open(rel_path, "r") as f:
     CONFIG = yaml.safe_load(f)
 all_other_fields = tuple(
