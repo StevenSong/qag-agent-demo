@@ -6,7 +6,7 @@ from guidance import json as gen_json
 from guidance.models import Transformers
 from transformers import AutoTokenizer, GPT2LMHeadModel, set_seed
 
-from schema import GDCCohortSchema  # isort: skip
+from .schema import GDCCohortSchema
 
 MODEL_NAME = "uc-ctds/gdc-cohort-llm-gpt2-s1M"
 TOKENIZER_NAME = MODEL_NAME

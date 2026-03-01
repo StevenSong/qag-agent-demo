@@ -1,110 +1,24 @@
 import argparse
-import re
+import json
 import sys
-from typing import Annotated, Any, Literal
 
-import requests
 from cachetools import TTLCache
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
-from pydantic import Field
+
+from ._defines import (
+    AAChange,
+    CaseCount,
+    CaseSetId,
+    CNVChange,
+    CohortDescription,
+    Gene,
+    MSIStatus,
+    Project,
+)
+from ._utils import gdc_query_all, suggest_tool_from_case_set_id
 
 case_cache = TTLCache(maxsize=1000, ttl=3600)
-GDC_API = "https://api.gdc.cancer.gov"
-
-
-def gdc_query_all(
-    endpoint: str,
-    filters: dict,
-    fields: list[str] | None = None,
-    page_size: int = 1000,
-) -> list[dict[str, Any]]:
-    url = f"{GDC_API}/{endpoint}"
-    all_hits = []
-    offset = 0
-
-    while True:
-        payload = {
-            "filters": filters,
-            "from": offset,
-            "size": page_size,
-        }
-
-        if fields:
-            # even if using post, fields needs to be a comma-separated string
-            payload["fields"] = ",".join(fields)
-
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        resp_json = response.json()
-
-        if resp_json["warnings"]:
-            print(resp_json["warnings"], file=sys.stderr)
-
-        data = resp_json["data"]
-
-        hits = data["hits"]
-        all_hits.extend(hits)
-
-        pagination = data["pagination"]
-        total = pagination["total"]
-
-        # print(f"Retrieved {len(all_hits)} / {total}", file=sys.stderr)
-
-        offset += page_size
-        if offset >= total:
-            break
-
-    return all_hits
-
-
-Project = Annotated[
-    str,
-    Field(
-        description="GDC project name, for example 'TCGA-BRCA'.",
-    ),
-]
-Gene = Annotated[
-    str,
-    Field(
-        description="Gene to query, for example 'BRAF'.",
-    ),
-]
-AAChange = Annotated[
-    str | None,
-    Field(
-        description="(Optional) Amino acid change to query (in HGVS protein notation), for example 'V600E'.",
-    ),
-]
-CNVChange = Annotated[
-    Literal["gain", "amplification", "heterozygous deletion", "homozygous deletion"]
-    | None,
-    Field(
-        description="(Optional) Copy number variation change to query. Valid options are 'gain', 'amplification', 'heterozygous deletion', or 'homozygous deletion'.",
-    ),
-]
-MSIStatus = Annotated[
-    Literal["msi", "mss"],
-    Field(
-        description="Microsatellite instability status. Valid options are 'msi' for microsatellite instable or 'mss' for microsatellite stable.",
-    ),
-]
-CaseSetId = Annotated[
-    str,
-    Field(
-        description=(
-            "ID representing a set of cases matching a specified query. "
-            "The retrieved cases are cached server side and are referenced by this identifier. "
-            "The ID additionally encodes the method by which the case set was computed, for example 'SSM-in-BRAF'."
-        ),
-    ),
-]
-CaseCount = Annotated[
-    int,
-    Field(
-        description="Number of cases for a retrieved or computed case set.",
-    ),
-]
 
 
 def get_simple_somatic_mutation_occurrences(
@@ -322,6 +236,49 @@ def get_cases_by_project(project: Project) -> CaseSetId:
     return cache_id
 
 
+def make_cohort_copilot_tool(generate_filter):
+    # The method to generate_filter should be modular so that improvements to cohort copilot
+    # can be reflected simply by using a revised implementation of generate_filter
+
+    def get_cases_by_cohort_description(
+        cohort_description: CohortDescription,
+    ) -> CaseSetId:
+        """
+        A tool to query the GDC API for cases of a described cohort, for example 'cases from the TCGA-BRCA project' or 'cases of non-smoking patients'.
+        The resulting case set is cached server side and can be referenced using the unique identifier returned by this tool.
+        While this tool can take natural language inputs, it is best used with very simple, single attribute descriptions.
+        Do NOT provide gene filters to this tool.
+        """
+        print(
+            f"get_cases_by_cohort_description(cohort_description={repr(cohort_description)})",
+            file=sys.stderr,
+        )
+
+        cache_id = f"Cases-Cohort-{cohort_description}"
+
+        # if we've already done this retrieval, refresh it in the cache and shortcut return
+        if cache_id in case_cache:
+            case_cache[cache_id] = case_cache[cache_id]
+            return cache_id
+
+        filter_str = generate_filter(cohort_description)
+
+        # NOTE: there's not a great way in the current tool design to surface the cohort filter to the user, for now just print it
+        print(f"Generated Cohort Filter:\n{filter_str}", file=sys.stderr)
+
+        hits = gdc_query_all(
+            endpoint="cases",
+            filters=json.loads(filter_str),
+            fields=["submitter_id"],
+        )
+        case_ids = set([hit["id"] for hit in hits])
+        case_cache[cache_id] = list(case_ids)
+
+        return cache_id
+
+    return get_cases_by_cohort_description
+
+
 def compute_case_intersection(
     case_set_id_A: CaseSetId,
     case_set_id_B: CaseSetId,
@@ -422,43 +379,6 @@ def get_case_set_size(
     return len(case_cache[case_set_id])
 
 
-TOOL_TO_CACHE_ID_PATTERN = {
-    "compute_case_intersection": re.compile(
-        r"Cases-Intersect-\((?P<case_set_id_A>.+)\)-AND-\((?P<case_set_id_B>.+)\)",
-    ),
-    "compute_case_union": re.compile(
-        r"Cases-Union-\((?P<case_set_id_A>.+)\)-AND-\((?P<case_set_id_B>.+)\)",
-    ),
-    "get_simple_somatic_mutation_occurrences": re.compile(
-        r"Cases-SSM-(?P<gene>[^-]+)(?:-(?P<aa_change>.+))?",
-    ),
-    "get_copy_number_variant_occurrences": re.compile(
-        r"Cases-CNV-(?P<gene>[^-]+)(?:-(?P<cnv_change>.+))?",
-    ),
-    "get_microsatellite_instability_occurrences": re.compile(
-        r"Cases-MSI-(?P<msi_status>.+)",
-    ),
-    "get_cases_by_project": re.compile(
-        r"Cases-Project-(?P<project>.+)",
-    ),
-}
-
-
-def suggest_tool_from_case_set_id(case_set_id: CaseSetId) -> str:
-    for tool_name, pattern in TOOL_TO_CACHE_ID_PATTERN.items():
-        if (m := pattern.match(case_set_id)) is not None:
-            tool_args = ", ".join([f"{k}={v}" for k, v in m.groupdict().items()])
-            return (
-                f"Based on the provided case_set_id={case_set_id}, "
-                f"it looks like you need to use the following tool with these args: "
-                f"{tool_name}({tool_args})"
-            )
-    return (
-        f"The provided case_set_id={case_set_id} did not match any known patterns returned by our tools. "
-        f"Are you sure the tools in this MCP server were used to query for cases?"
-    )
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -472,6 +392,11 @@ if __name__ == "__main__":
         "--port",
         type=int,
         default=8000,
+    )
+    parser.add_argument(
+        "--use-cohort-copilot",
+        default=False,
+        action="store_true",
     )
     args = parser.parse_args()
 
@@ -493,7 +418,14 @@ if __name__ == "__main__":
     mcp.add_tool(get_simple_somatic_mutation_occurrences)
     mcp.add_tool(get_copy_number_variant_occurrences)
     mcp.add_tool(get_microsatellite_instability_occurrences)
-    mcp.add_tool(get_cases_by_project)
+    if args.use_cohort_copilot:
+        # NOTE: with cohort copilot v1, importing will load a model onto GPU so defer until needed
+        from .cohort_copilot import generate_filter
+
+        get_cases_by_cohort_description = make_cohort_copilot_tool(generate_filter)
+        mcp.add_tool(get_cases_by_cohort_description)
+    else:
+        mcp.add_tool(get_cases_by_project)
     mcp.add_tool(compute_case_intersection)
     mcp.add_tool(compute_case_union)
     mcp.add_tool(get_case_set_size)
